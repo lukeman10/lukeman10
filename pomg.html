@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Basic Snake HTML Game</title>
+  <meta charset="UTF-8">
+  <style>
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    background: black;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas {
+    border: 1px solid white;
+  }
+  </style>
+</head>
+<body>
+<canvas width="600" height="400" id="game"></canvas>
+<script>
+var canvas = document.getElementById('game');
+var context = canvas.getContext('2d');
+
+// the canvas width & height, snake x & y, and the apple x & y, all need to be a multiples of the grid size in order for collision detection to work
+// (e.g. 16 * 25 = 400)
+var count = 0;
+
+var ball_speed = 5;
+
+var paddle_speed = 5
+
+var ball = {
+  x: 280,
+  y: 180,
+  dx: -1,
+  dy: -1,
+}
+
+var paddle = {
+    y: 200,
+    x: 10,
+}
+
+
+// get random whole numbers in a specific range
+// @see https://stackoverflow.com/a/1527820/2124254
+
+
+// game loop
+function loop() {
+    requestAnimationFrame(loop);
+
+
+    count = 0;
+    context.clearRect(0,0,canvas.width,canvas.height);
+
+
+
+
+    context.fillStyle = "white";
+    context.fillRect(ball.x, ball.y, 10, 10);
+    context.fillRect(paddle.x, paddle.y, 5, 60);
+
+
+    ball.x += ball.dx * ball_speed;
+    ball.y += ball.dy * ball_speed;
+
+    if (ball.y < 1) {
+        ball.dy = 1;
+    }
+    if (ball.y > canvas.height - 11) {
+        ball.dy = -1;
+    }
+
+    if (ball.x < 15 && ball.y > paddle.y && ball.y < paddle.y + 60) {
+        ball.dx = 1;
+    }
+
+    if (ball.x > canvas.width - 11) {
+        ball.dx = -1;
+    }
+
+    paddle.y = mouse_y
+}
+
+// listen to keyboard events to move the snake
+document.addEventListener('keydown', function(e) {
+
+  if (e.which === 38) {
+    paddle.y -= ball_speed;
+  }
+
+  if (e.which === 40) {
+    paddle.y += ball_speed;
+  }
+
+})
+
+document.addEventListener('mousemove', function(event) {
+  let mouse_x = event.clientX;
+  let mouse_y = event.clientY;
+});
+// start the game
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
