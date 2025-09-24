@@ -26,8 +26,8 @@ h1{
 
 .navbar{
 
-    background-color: hsl(0, 0%, 25%);
-
+    background-color: hsl(182, 45%, 28%);
+    font-family: 'Courier New', Courier, monospace;
 }
 
 
@@ -71,4 +71,17 @@ h1{
 
 }
 
+html{
+    background-color: rgb(122, 246, 184);
+}
 
+div {
+    font-size: medium;
+    font-family: 'Courier New', Courier, monospace;
+    display: grid;
+    place-items: center;
+}
+
+h1 {
+    font-family: 'Courier New', Courier, monospace;
+}

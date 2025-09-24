@@ -32,7 +32,7 @@ var count = 0;
 
 var ball_speed = 5;
 
-var paddle_speed = 5
+var paddle_speed = 5;
 
 var ball = {
   x: 280,
@@ -44,7 +44,12 @@ var ball = {
 var paddle = {
     y: 200,
     x: 10,
+    dy: 0
+    
 }
+
+var move_up;
+var move_down;
 
 
 // get random whole numbers in a specific range
@@ -67,8 +72,18 @@ function loop() {
     context.fillRect(paddle.x, paddle.y, 5, 60);
 
 
+
+
     ball.x += ball.dx * ball_speed;
     ball.y += ball.dy * ball_speed;
+
+    paddlde.y += paddle_speed;
+
+   
+
+
+
+
 
     if (ball.y < 1) {
         ball.dy = 1;
@@ -85,19 +100,26 @@ function loop() {
         ball.dx = -1;
     }
 
-    paddle.y = mouse_y
+
+
 }
 
 // listen to keyboard events to move the snake
 document.addEventListener('keydown', function(e) {
+  if (e.which > 30) {
+  
 
-  if (e.which === 38) {
-    paddle.y -= ball_speed;
+    if (e.which === 38) {
+      paddle_speed = -5;
+
+    }
+
+    if (e.which === 40) {
+      paddle_speed = 5;
+    }
   }
 
-  if (e.which === 40) {
-    paddle.y += ball_speed;
-  }
+
 
 })
 
