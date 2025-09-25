@@ -48,13 +48,12 @@ var paddle = {
     
 }
 
-var move_up;
-var move_down;
+let dir = 0;
+
 
 
 // get random whole numbers in a specific range
 // @see https://stackoverflow.com/a/1527820/2124254
-
 
 // game loop
 function loop() {
@@ -77,7 +76,12 @@ function loop() {
     ball.x += ball.dx * ball_speed;
     ball.y += ball.dy * ball_speed;
 
-    paddlde.y += paddle_speed;
+    if (dir == 1) {
+      paddle.y += paddle_speed;
+    }
+    else if (dir == -1) {
+      paddle.y -= paddle_speed;
+    }
 
    
 
@@ -99,6 +103,7 @@ function loop() {
     if (ball.x > canvas.width - 11) {
         ball.dx = -1;
     }
+    alert(e.which)
 
 
 
@@ -106,18 +111,22 @@ function loop() {
 
 // listen to keyboard events to move the snake
 document.addEventListener('keydown', function(e) {
-  if (e.which > 30) {
-  
 
-    if (e.which === 38) {
-      paddle_speed = -5;
+   
 
+  if (e.which === 38) {
+    dir = -1;
     }
-
-    if (e.which === 40) {
-      paddle_speed = 5;
-    }
+  else if (e.which === 40) {
+    dir = 1;   
   }
+
+
+  if (e.which === 0) {
+      alert("hello");
+  }
+
+  
 
 
 
