@@ -28,6 +28,7 @@ h1{
 
     background-color: hsl(136, 48%, 16%);
     font-family: 'Courier New', Courier, monospace;
+    list-style-type: none;
 }
 
 
@@ -49,7 +50,7 @@ h1{
 
 .navbar a{
 
-    color: white;
+    color: rgb(0, 176, 0);
 
     text-decoration: none;
 
@@ -59,6 +60,7 @@ h1{
 
     text-align: center;
 
+    font-family: 'Courier New', Courier, monospace;
 
 
 }
@@ -67,7 +69,7 @@ h1{
 
 .navbar a:hover{
 
-    background-color: hsl(0, 0%, 10%);
+    background-color: hsl(120, 7%, 9%);
 
 }
 
@@ -80,8 +82,14 @@ div {
     font-family: 'Courier New', Courier, monospace;
     display: grid;
     place-items: center;
+    color:rgb(0, 176, 0)
 }
 
 h1 {
     font-family: 'Courier New', Courier, monospace;
+    color: rgb(0, 176, 0);
+}
+
+.games-list {
+    list-style-type: none;
 }
