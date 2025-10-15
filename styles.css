@@ -40,7 +40,7 @@ h1{
 
     margin: 0px;
 
-    display: inline-flex;
+    display: block;
 
 
 
@@ -74,7 +74,7 @@ h1{
 }
 
 html{
-    background-color: rgb(12, 84, 35);
+    background-image: linear-gradient(to left, rgb(0, 51, 0), green);
 }
 
 div {
@@ -93,3 +93,4 @@ h1 {
 .games-list {
     list-style-type: none;
 }
+
