@@ -26,13 +26,15 @@
 var canvas = document.getElementById('game');
 var context = canvas.getContext('2d');
 
-// the canvas width & height, snake x & y, and the apple x & y, all need to be a multiples of the grid size in order for collision detection to work
-// (e.g. 16 * 25 = 400)
+
 var count = 0;
 
 var ball_speed = 5;
 
 var paddle_speed = 5;
+
+let rightPressed = false;
+let leftPressed = false;
 
 var ball = {
   x: 280,
@@ -44,11 +46,21 @@ var ball = {
 var paddle = {
     y: 200,
     x: 10,
-    dy: 0
+
+    
+}
+
+var cpu = {
+    y: 200,
+    x: 590,
+
     
 }
 
 let dir = 0;
+
+let score = 0;
+let cpu_score = 0;
 
 
 
@@ -68,6 +80,7 @@ function loop() {
 
     context.fillStyle = "white";
     context.fillRect(ball.x, ball.y, 10, 10);
+    context.fillRect(cpu.x, cpu.y, 5, 60);
     context.fillRect(paddle.x, paddle.y, 5, 60);
 
 
@@ -76,12 +89,17 @@ function loop() {
     ball.x += ball.dx * ball_speed;
     ball.y += ball.dy * ball_speed;
 
-    if (dir == 1) {
+    if (leftPressed && paddle.y < canvas.height - 60) {
       paddle.y += paddle_speed;
     }
-    else if (dir == -1) {
+    else if (rightPressed && paddle.y > 0) {
       paddle.y -= paddle_speed;
     }
+
+    context.font = '30px sans-serif';
+    context.fillStyle = 'white';
+
+    context.fillText(score + ' - ' + cpu_score, canvas.width/2 - 50, 30);
 
    
 
@@ -100,42 +118,60 @@ function loop() {
         ball.dx = 1;
     }
 
-    if (ball.x > canvas.width - 11) {
+    if (ball.x > 575 && ball.y > cpu.y && ball.y < cpu.y + 60) {
         ball.dx = -1;
     }
-    alert(e.which)
+
+    if (ball.x > canvas.width - 11) {
+        score += 1;
+        ball.x = canvas.width/2;
+        ball.y = canvas.height/2;
+    }
+
+    if (ball.x < 0) {
+        cpu_score += 1;
+        ball.x = canvas.width/2;
+        ball.y = canvas.height/2;
+    }
 
 
+    if (cpu.y + 30 < ball.y + 5) {
+        cpu.y += paddle_speed;
+    }
+    else if (cpu.y + 30 > ball.y + 5) {
+        cpu.y -= paddle_speed;
+    }
+
+    if (cpu.y < 0) {
+        cpu.y = 0;
+    }
+    if (cpu.y > canvas.height - 60) {
+        cpu.y = canvas.height - 60;
+    }
+
+    cpu.
 
 }
 
 // listen to keyboard events to move the snake
-document.addEventListener('keydown', function(e) {
-
-   
-
-  if (e.which === 38) {
-    dir = -1;
-    }
-  else if (e.which === 40) {
-    dir = 1;   
+function keyDownHandler(e) {
+  if (e.key === "Up" || e.key === "ArrowUp") {
+    rightPressed = true;
+  } else if (e.key === "Down" || e.key === "ArrowDown") {
+    leftPressed = true;
   }
+}
 
-
-  if (e.which === 0) {
-      alert("hello");
+function keyUpHandler(e) {
+  if (e.key === "Up" || e.key === "ArrowUp") {
+    rightPressed = false;
+  } else if (e.key === "Down" || e.key === "ArrowDown") {
+    leftPressed = false;
   }
+}
 
-  
-
-
-
-})
-
-document.addEventListener('mousemove', function(event) {
-  let mouse_x = event.clientX;
-  let mouse_y = event.clientY;
-});
+document.addEventListener("keydown", keyDownHandler);
+document.addEventListener("keyup", keyUpHandler);
 // start the game
 requestAnimationFrame(loop);
 </script>
