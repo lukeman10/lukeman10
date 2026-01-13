@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Advanced Clicker Game</title>
+  <meta charset="UTF-8">
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: black;
+      font-family: Arial, sans-serif;
+      color: white;
+    }
+
+    .container {
+      display: flex;
+      gap: 40px;
+      align-items: flex-start;
+    }
+
+    canvas {
+      border: 1px solid white;
+      cursor: pointer;
+    }
+
+    .stats {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .shop {
+      border: 1px solid white;
+      padding: 20px;
+      width: 250px;
+      background: #111;
+      position: relative;
+    }
+
+    .shop h2 {
+      text-align: center;
+      margin-top: 0;
+    }
+
+    .shop button {
+      width: 100%;
+      margin: 8px 0;
+      padding: 10px;
+      background: #222;
+      color: white;
+      border: 1px solid white;
+      cursor: pointer;
+      font-size: 16px;
+      transition: transform 0.1s ease;
+    }
+
+    .shop button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .message {
+      position: absolute;
+      top: -25px;
+      width: 100%;
+      text-align: center;
+      font-weight: bold;
+      color: #0f0;
+      opacity: 0;
+      transition: opacity 0.3s, top 0.3s;
+    }
+
+    .message.show {
+      opacity: 1;
+      top: -50px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div>
+      <div class="stats">
+        <div>Coins: <span id="coinDisplay">0</span></div>
+        <div>Coins per Click: <span id="cpcDisplay">1</span></div>
+        <div>Coins per Second: <span id="cpsDisplay">0</span></div>
+      </div>
+      <canvas width="600" height="400" id="game"></canvas>
+    </div>
+
+    <div class="shop">
+      <h2>🏪 Shop</h2>
+      <button id="upgrade1">Click Power (+1) — <span id="cost1">20</span> coins</button>
+      <button id="upgrade2">Click Power (+5) — <span id="cost2">100</span> coins</button>
+      <button id="upgrade3">Click Power (+20) — <span id="cost3">500</span> coins</button>
+      <button id="autoclicker">Auto Clicker (+1/sec) — <span id="costAuto">200</span> coins</button>
+      <div class="message" id="shopMessage"></div>
+    </div>
+  </div>
+
+  <img src="24e75930a8f463192dadb16fe58bdf29.jpg" id="block" hidden width="10%">
+
+  <script>
+    const canvas = document.getElementById('game');
+    const context = canvas.getContext('2d');
+    const block = document.getElementById("block");
+
+    const coinDisplay = document.getElementById('coinDisplay');
+    const cpcDisplay = document.getElementById('cpcDisplay');
+    const cpsDisplay = document.getElementById('cpsDisplay');
+    const shopMessage = document.getElementById('shopMessage');
+
+    const upgrade1 = document.getElementById('upgrade1');
+    const upgrade2 = document.getElementById('upgrade2');
+    const upgrade3 = document.getElementById('upgrade3');
+    const autoclickerBtn = document.getElementById('autoclicker');
+
+    const cost1Elem = document.getElementById('cost1');
+    const cost2Elem = document.getElementById('cost2');
+    const cost3Elem = document.getElementById('cost3');
+    const costAutoElem = document.getElementById('costAuto');
+
+    let coins = 0;
+    let clickPower = 1;
+    let autoClickers = 0;
+    let lastUpdate = Date.now();
+
+    let cost1 = 20;
+    let cost2 = 100;
+    let cost3 = 500;
+    let costAuto = 200;
+
+    // Animation variables
+    const blockX = 260;
+    const blockY = 160;
+    const baseSize = 80;
+    let animScale = 1;
+    let animSpeed = 0;
+
+    // Load saved data
+    function loadGame() {
+      const save = JSON.parse(localStorage.getItem('clickerSave'));
+      if (save) {
+        coins = save.coins || 0;
+        clickPower = save.clickPower || 1;
+        autoClickers = save.autoClickers || 0;
+        cost1 = save.cost1 || 20;
+        cost2 = save.cost2 || 100;
+        cost3 = save.cost3 || 500;
+        costAuto = save.costAuto || 200;
+        lastUpdate = save.lastUpdate || Date.now();
+
+        // Offline earnings
+        const now = Date.now();
+        const delta = (now - lastUpdate) / 1000;
+        coins += autoClickers * delta;
+      }
+    }
+
+    function saveGame() {
+      localStorage.setItem('clickerSave', JSON.stringify({
+        coins,
+        clickPower,
+        autoClickers,
+        cost1,
+        cost2,
+        cost3,
+        costAuto,
+        lastUpdate: Date.now()
+      }));
+    }
+
+    function updateDisplay() {
+      coinDisplay.textContent = Math.floor(coins);
+      cpcDisplay.textContent = clickPower;
+      cpsDisplay.textContent = autoClickers;
+      cost1Elem.textContent = Math.floor(cost1);
+      cost2Elem.textContent = Math.floor(cost2);
+      cost3Elem.textContent = Math.floor(cost3);
+      costAutoElem.textContent = Math.floor(costAuto);
+    }
+
+    function loop() {
+      requestAnimationFrame(loop);
+
+      // Clear canvas
+      context.fillStyle = "black";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Animate block
+      if (animScale > 1) {
+        animScale -= animSpeed;
+        if (animScale < 1) animScale = 1;
+      }
+
+      const drawSize = baseSize * animScale;
+      const drawX = blockX - (drawSize - baseSize) / 2;
+      const drawY = blockY - (drawSize - baseSize) / 2;
+      context.drawImage(block, drawX, drawY, drawSize, drawSize);
+
+      // Coins per second
+      const now = Date.now();
+      const delta = (now - lastUpdate) / 1000;
+      coins += autoClickers * delta;
+      lastUpdate = now;
+
+      updateDisplay();
+      saveGame();
+    }
+
+    // Click handler
+    canvas.addEventListener('click', e => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      if (mouseX >= blockX && mouseX <= blockX + baseSize &&
+          mouseY >= blockY && mouseY <= blockY + baseSize) {
+        coins += clickPower;
+        animScale = 1.3;
+        animSpeed = 0.05;
+        updateDisplay();
+      }
+    });
+
+    function buyUpgrade(cost, bonus, button, type) {
+      if (coins >= cost) {
+        coins -= cost;
+
+        // Button animation
+        button.style.transform = "scale(1.2)";
+        setTimeout(() => { button.style.transform = "scale(1)"; }, 150);
+
+        // Apply upgrade
+        if (type === "click") clickPower += bonus;
+        if (type === "auto") autoClickers += bonus;
+
+        // Increase cost
+        cost *= type === "click" ? 1.5 : 1.7;
+
+        // Update costs
+        if (button === upgrade1) cost1 = cost;
+        if (button === upgrade2) cost2 = cost;
+        if (button === upgrade3) cost3 = cost;
+        if (button === autoclickerBtn) costAuto = cost;
+
+        shopMessage.textContent = `Purchased ${type === 'click' ? 'Click Power' : 'Auto Clicker'}!`;
+        shopMessage.classList.add('show');
+        setTimeout(() => shopMessage.classList.remove('show'), 1000);
+
+        updateDisplay();
+      } else {
+        shopMessage.textContent = `Not enough coins!`;
+        shopMessage.classList.add('show');
+        setTimeout(() => shopMessage.classList.remove('show'), 1000);
+      }
+    }
+
+    upgrade1.addEventListener('click', () => buyUpgrade(cost1, 1, upgrade1, "click"));
+    upgrade2.addEventListener('click', () => buyUpgrade(cost2, 5, upgrade2, "click"));
+    upgrade3.addEventListener('click', () => buyUpgrade(cost3, 20, upgrade3, "click"));
+    autoclickerBtn.addEventListener('click', () => buyUpgrade(costAuto, 1, autoclickerBtn, "auto"));
+
+    loadGame();
+    updateDisplay();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

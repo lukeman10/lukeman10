@@ -28,13 +28,18 @@ var context = canvas.getContext('2d');
 
 
 var count = 0;
-
+var distance_to_cpu = 0;
 var ball_speed = 5;
 
 var paddle_speed = 5;
+var cpu_speed = 4;
 
 let rightPressed = false;
 let leftPressed = false;
+
+const REACTION_CHANCE = 0.98;   // higher = smarter CPU
+const PANIC_DISTANCE = 200;
+const PANIC_SPEED = 6;
 
 var ball = {
   x: 280,
@@ -53,6 +58,7 @@ var paddle = {
 var cpu = {
     y: 200,
     x: 590,
+    dir: 1,
 
     
 }
@@ -88,6 +94,8 @@ function loop() {
 
     ball.x += ball.dx * ball_speed;
     ball.y += ball.dy * ball_speed;
+
+    distance_to_cpu = ball.x - paddle.x;
 
     if (leftPressed && paddle.y < canvas.height - 60) {
       paddle.y += paddle_speed;
@@ -134,20 +142,38 @@ function loop() {
         ball.y = canvas.height/2;
     }
 
+if (Math.random() > REACTION_CHANCE) {
+  // do nothing this frame
+} else {
 
-    if (cpu.y + 30 < ball.y + 5) {
-        cpu.y += paddle_speed;
-    }
-    else if (cpu.y + 30 > ball.y + 5) {
-        cpu.y -= paddle_speed;
-    }
+  // Aim error scales with ball speed
+  let error = ball_speed * 0.5;
+  let targetY = ball.y + 5 + error * (Math.random() - 0.5);
 
-    if (cpu.y < 0) {
-        cpu.y = 0;
+  if (distance_to_cpu > PANIC_DISTANCE) {
+    // Smart tracking mode
+    if (cpu.y + 30 < targetY) {
+      cpu.y += cpu_speed;
+    } 
+    else if (cpu.y + 30 > targetY) {
+      cpu.y -= cpu_speed;
     }
-    if (cpu.y > canvas.height - 60) {
-        cpu.y = canvas.height - 60;
-    }
+  } 
+  else if (distance_to_cpu < PANIC_DISTANCE && ball.speed > PANIC_SPEED) {
+    // Panic mode only if ball is fast
+    cpu.y += cpu_speed * dir;
+  }
+}
+
+// Wall collision & direction flip
+if (cpu.y < 0) {
+  cpu.y = 0;
+  dir = 1;
+}
+if (cpu.y > canvas.height - 60) {
+  cpu.y = canvas.height - 60;
+  dir = -1;
+}
 
 
 
