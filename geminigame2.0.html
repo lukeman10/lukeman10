@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bit-Shift Rogue - Final</title>
+    <style>
+        body { background: #0a0a0a; color: #0f0; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        #game-container { position: relative; border: 4px solid #0f0; box-shadow: 0 0 20px #0f04; transition: transform 0.1s; }
+        canvas { display: block; image-rendering: pixelated; background: #000; }
+        .stats { margin-bottom: 15px; font-size: 1.5rem; letter-spacing: 2px; text-shadow: 0 0 10px #0f0; }
+        #log { margin-top: 15px; color: #0f0; font-weight: bold; height: 1.5rem; text-transform: uppercase; }
+        .kb-hint { font-size: 0.7rem; color: #444; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="stats">HP: <span id="hp">20</span> | LVL: <span id="lvl">1</span> | KEY: <span id="key">NO</span></div>
+    <div id="game-container"><canvas id="c"></canvas></div>
+    <div id="log">WELCOME TO THE GRID</div>
+    <div class="kb-hint">ARROWS TO MOVE/ATTACK | PUSH AGAINST ENEMIES TO STRIKE</div>
+
+    <script>
+        const canvas = document.getElementById('c');
+        const ctx = canvas.getContext('2d');
+        const TILE = 45;
+        const GRID = 11; 
+        canvas.width = canvas.height = TILE * GRID;
+
+        let player = { x: 0, y: 0, hp: 20, lvl: 1, hasKey: false };
+        let dungeon = [];
+        let enemies = [];
+        let exit = { x: 0, y: 0 };
+        let keyPos = { x: 0, y: 0 };
+
+        function generateSolvableMap() {
+            // 1. Fill with walls
+            dungeon = Array(GRID).fill().map(() => Array(GRID).fill(1));
+            
+            // 2. Carve paths (Random Walk)
+            let x = 1, y = 1;
+            dungeon[y][x] = 0;
+            player.x = x; player.y = y;
+            
+            let cellsToCarve = 50;
+            while (cellsToCarve > 0) {
+                let dir = [[0,1],[0,-1],[1,0],[-1,0]][Math.floor(Math.random()*4)];
+                let nx = Math.max(1, Math.min(GRID-2, x + dir[0]));
+                let ny = Math.max(1, Math.min(GRID-2, y + dir[1]));
+                if (dungeon[ny][nx] === 1) {
+                    dungeon[ny][nx] = 0;
+                    cellsToCarve--;
+                }
+                x = nx; y = ny;
+            }
+
+            // 3. Place key and exit on empty tiles (guaranteed reachable)
+            let emptyTiles = [];
+            for(let r=0; r<GRID; r++) for(let c=0; c<GRID; c++) if(dungeon[r][c]===0) emptyTiles.push({x:c, y:r});
+            
+            // Shuffle empty tiles
+            emptyTiles.sort(() => Math.random() - 0.5);
+            
+            keyPos = emptyTiles[0];
+            exit = emptyTiles[1];
+
+            // 4. Spawn enemies on remaining empty tiles
+            enemies = [];
+            for(let i=0; i < 2 + player.lvl; i++) {
+                if(emptyTiles[i+2]) {
+                    enemies.push({ x: emptyTiles[i+2].x, y: emptyTiles[i+2].y, hp: 2 });
+                }
+            }
+        }
+
+        function screenShake() {
+            const container = document.getElementById('game-container');
+            container.style.transform = `translate(${Math.random()*10-5}px, ${Math.random()*10-5}px)`;
+            setTimeout(() => container.style.transform = 'translate(0,0)', 50);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for(let y=0; y<GRID; y++) {
+                for(let x=0; x<GRID; x++) {
+                    let dist = Math.hypot(x-player.x, y-player.y);
+                    
+                    if(dist > 3.5) {
+                        ctx.fillStyle = '#050505';
+                    } else {
+                        ctx.fillStyle = dungeon[y][x] === 1 ? '#1a1a1a' : '#0a1a0a';
+                    }
+                    ctx.fillRect(x*TILE, y*TILE, TILE-2, TILE-2);
+
+                    if(dist <= 3.5) {
+                        if(x === keyPos.x && y === keyPos.y && !player.hasKey) {
+                            ctx.font = "24px Arial"; ctx.fillText('🔑', x*TILE+10, y*TILE+32);
+                        }
+                        if(x === exit.x && y === exit.y) {
+                            ctx.fillStyle = player.hasKey ? '#0f0' : '#300';
+                            ctx.fillRect(x*TILE+12, y*TILE+12, 20, 20);
+                            if(player.hasKey) { ctx.shadowBlur=15; ctx.shadowColor="#0f0"; }
+                        }
+                    }
+                }
+            }
+
+            enemies.forEach(en => {
+                if(Math.hypot(en.x-player.x, en.y-player.y) <= 3.5) {
+                    ctx.fillStyle = '#f0f';
+                    ctx.font = "24px Arial";
+                    ctx.fillText('👾', en.x*TILE+8, en.y*TILE+32);
+                }
+            });
+
+            ctx.shadowBlur = 10; ctx.shadowColor = "#0f0";
+            ctx.fillStyle = '#0f0';
+            ctx.fillText('👤', player.x*TILE+8, player.y*TILE+32);
+            ctx.shadowBlur = 0;
+        }
+
+        window.onkeydown = (e) => {
+            let dx = 0, dy = 0;
+            if(e.key === 'ArrowUp') dy = -1;
+            if(e.key === 'ArrowDown') dy = 1;
+            if(e.key === 'ArrowLeft') dx = -1;
+            if(e.key === 'ArrowRight') dx = 1;
+
+            if(dx === 0 && dy === 0) return;
+
+            let nx = player.x + dx;
+            let ny = player.y + dy;
+
+            if(dungeon[ny] && dungeon[ny][nx] === 0) {
+                let targetIdx = enemies.findIndex(en => en.x === nx && en.y === ny);
+                if(targetIdx > -1) {
+                    // Attack
+                    enemies[targetIdx].hp--;
+                    document.getElementById('log').innerText = "HIT GLITCH!";
+                    screenShake();
+                    if(enemies[targetIdx].hp <= 0) enemies.splice(targetIdx, 1);
+                } else {
+                    // Move
+                    player.x = nx;
+                    player.y = ny;
+                    if(player.x === keyPos.x && player.y === keyPos.y) {
+                        player.hasKey = true;
+                        document.getElementById('log').innerText = "OBTAINED KEY";
+                    }
+                    if(player.x === exit.x && player.y === exit.y && player.hasKey) {
+                        player.lvl++;
+                        player.hp += 5;
+                        document.getElementById('log').innerText = "DESCENDING...";
+                        generateSolvableMap();
+                    }
+                }
+
+                // Enemies move
+                enemies.forEach(en => {
+                    let edx = Math.sign(player.x - en.x);
+                    let edy = Math.sign(player.y - en.y);
+                    
+                    if(Math.random() > 0.5) {
+                        let mx = en.x + edx, my = en.y + edy;
+                        if(mx === player.x && my === player.y) {
+                            player.hp--;
+                            document.getElementById('log').innerText = "SYSTEM DAMAGE!";
+                            screenShake();
+                        } else if(dungeon[my] && dungeon[my][mx] === 0 && !enemies.find(o => o.x === mx && o.y === my)) {
+                            en.x = mx; en.y = my;
+                        }
+                    }
+                });
+            }
+
+            if(player.hp <= 0) {
+                alert("CRITICAL FAILURE. Level reached: " + player.lvl);
+                location.reload();
+            }
+            
+            document.getElementById('hp').innerText = player.hp;
+            document.getElementById('lvl').innerText = player.lvl;
+            document.getElementById('key').innerText = player.hasKey ? "YES" : "NO";
+            draw();
+        };
+
+        generateSolvableMap();
+        draw();
+    </script>
+</body>
+</html>

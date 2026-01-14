@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Trench 3D</title>
+    <style>
+        body { margin: 0; background: #050505; color: #0ff; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        #hud { position: absolute; top: 20px; left: 20px; text-transform: uppercase; letter-spacing: 2px; }
+        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; display: none; }
+        canvas { display: block; }
+        .glitch { animation: glitch 1s infinite; color: #f0f; }
+        @keyframes glitch { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        Velocity: <span id="vel">0</span>u/s<br>
+        Distance: <span id="dist">0</span>
+    </div>
+    <div id="msg">
+        <h1 class="glitch">SYSTEM CRASH</h1>
+        <button onclick="location.reload()" style="background:none; border: 1px solid #0ff; color: #0ff; padding: 10px 20px; cursor: pointer;">REBOOT</button>
+    </div>
+    <canvas id="c"></canvas>
+
+<script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    let distance = 0;
+    let speed = 20;
+    let gameActive = true;
+    const fov = 400;
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    const mouse = { x: 0, y: 0 };
+    window.onmousemove = (e) => {
+        mouse.x = (e.clientX - centerX) * 0.8;
+        mouse.y = (e.clientY - centerY) * 0.8;
+    };
+
+    // 3D Starfield
+    const stars = [];
+    for(let i=0; i<200; i++) {
+        stars.push({ x: (Math.random()-0.5)*4000, y: (Math.random()-0.5)*4000, z: Math.random()*4000 });
+    }
+
+    // 3D Obstacles (Gates)
+    const gates = [];
+    function createGate(z) {
+        return {
+            x: (Math.random() - 0.5) * 1500,
+            y: (Math.random() - 0.5) * 1500,
+            z: z,
+            w: 400,
+            h: 400
+        };
+    }
+    for(let i=0; i<5; i++) gates.push(createGate(1000 + i * 800));
+
+    function project(p) {
+        const scale = fov / (fov + p.z);
+        return {
+            x: (p.x - mouse.x) * scale + centerX,
+            y: (p.y - mouse.y) * scale + centerY,
+            s: scale
+        };
+    }
+
+    function loop() {
+        if(!gameActive) return;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        distance += Math.floor(speed/5);
+        speed += 0.01;
+        document.getElementById('dist').innerText = distance;
+        document.getElementById('vel').innerText = Math.floor(speed * 10);
+
+        // Draw Stars
+        ctx.fillStyle = "#fff";
+        stars.forEach(s => {
+            s.z -= speed;
+            if(s.z < 0) s.z = 4000;
+            const p = project(s);
+            ctx.globalAlpha = 1 - (s.z / 4000);
+            ctx.fillRect(p.x, p.y, p.s * 4, p.s * 4);
+        });
+
+        // Draw Trench Gates
+        gates.forEach((g, i) => {
+            g.z -= speed;
+            if(g.z < 0) {
+                gates[i] = createGate(4000);
+                return;
+            }
+
+            const p = project(g);
+            const size = g.w * p.s;
+
+            // Collision Check
+            if(g.z < speed && g.z > -speed) {
+                const screenPlayerX = centerX;
+                const screenPlayerY = centerY;
+                const dx = Math.abs(p.x - screenPlayerX);
+                const dy = Math.abs(p.y - screenPlayerY);
+                
+                if(dx > size/2 || dy > size/2) {
+                    gameActive = false;
+                    document.getElementById('msg').style.display = 'block';
+                }
+            }
+
+            // Draw Wireframe Gate
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = `hsl(${200 + (g.z/20)}, 100%, 50%)`;
+            ctx.lineWidth = p.s * 10;
+            ctx.strokeRect(p.x - size/2, p.y - size/2, size, size);
+            
+            // Connecting Lines (Depth Effect)
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(p.x - size/2, p.y - size/2);
+            ctx.lineTo(centerX, centerY); // Lines point to vanishing point
+            ctx.stroke();
+        });
+
+        requestAnimationFrame(loop);
+    }
+
+    loop();
+</script>
+</body>
+</html>

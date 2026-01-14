@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>🧩 Puzzle Platformer Tiebreaker 🧩</title>
+<style>
+body { margin:0; background:#222; font-family:Arial,sans-serif; }
+canvas { display:block; margin:0 auto; background:#333; }
+#hud { position:fixed; top:10px; left:10px; color:#fff; font-size:18px; }
+#gameOver { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); color:#fff; 
+           display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:32px;}
+button { padding:8px 12px; margin-top:10px; font-size:16px; cursor:pointer;}
+</style>
+</head>
+<body>
+<div id="hud">
+Level: <span id="level">1</span> | Moves: <span id="moves">0</span>
+</div>
+<canvas id="game" width="800" height="500"></canvas>
+<div id="gameOver">
+  <div id="gameOverText">You finished!</div>
+  <button onclick="restartGame()">Restart Game</button>
+</div>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const tileSize = 40;
+
+let currentLevel = 0;
+let moves = 0;
+const levelEl = document.getElementById("level");
+const movesEl = document.getElementById("moves");
+const gameOverEl = document.getElementById("gameOver");
+const gameOverText = document.getElementById("gameOverText");
+
+const levels = [
+`################
+#..............#
+#..B......💀...#
+#..............#
+#....🔵.........#
+#..............#
+#..🧑.....🚪...#
+################`,
+`################
+#..............#
+#..💀..B.......#
+#..............#
+#..🔵...........#
+#..............#
+#..🧑.....🚪...#
+################`,
+`################
+#..💀...B...💀..#
+#..............#
+#..B....🔵......#
+#..............#
+#..🧑.....🚪...#
+################`
+];
+
+let grid = [];
+let player = {x:0,y:0};
+let boxes = [];
+let switches = [];
+let hazards = [];
+let exit = {x:0,y:0};
+
+function parseLevel(n){
+  const raw = levels[n].split("\n");
+  grid = [];
+  boxes = [];
+  switches = [];
+  hazards = [];
+  moves = 0;
+  movesEl.textContent = moves;
+  levelEl.textContent = n+1;
+  for(let y=0;y<raw.length;y++){
+    const row = [];
+    for(let x=0;x<raw[y].length;x++){
+      const c = raw[y][x];
+      row.push(c);
+      if(c==='🧑') player = {x:x,y:y};
+      if(c==='🟫' || c==='B') boxes.push({x:x,y:y});
+      if(c==='🔵') switches.push({x:x,y:y,active:false});
+      if(c==='💀') hazards.push({x:x,y:y});
+      if(c==='🚪') exit = {x:x,y:y};
+    }
+    grid.push(row);
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(let y=0;y<grid.length;y++){
+    for(let x=0;x<grid[y].length;x++){
+      const tx = x*tileSize;
+      const ty = y*tileSize;
+      ctx.fillStyle="#444";
+      if(grid[y][x]==='#') ctx.fillStyle="#888";
+      ctx.fillRect(tx,ty,tileSize,tileSize);
+      if(grid[y][x]==='💀'){
+        ctx.fillStyle="#f00";
+        ctx.fillRect(tx+5,ty+5,tileSize-10,tileSize-10);
+      }
+      if(grid[y][x]==='🔵'){
+        ctx.fillStyle=switches.find(s=>s.x===x&&s.y===y).active?"#0f0":"#00f";
+        ctx.fillRect(tx+10,ty+10,tileSize-20,tileSize-20);
+      }
+      if(grid[y][x]==='🚪'){
+        ctx.fillStyle="#ff0";
+        ctx.fillRect(tx+5,ty+5,tileSize-30,tileSize-10);
+      }
+    }
+  }
+  // draw boxes
+  ctx.fillStyle="#a52a2a";
+  for(let b of boxes){
+    ctx.fillRect(b.x*tileSize+5,b.y*tileSize+5,tileSize-10,tileSize-10);
+  }
+  // draw player
+  ctx.fillStyle="#0ff";
+  ctx.fillRect(player.x*tileSize+5,player.y*tileSize+5,tileSize-10,tileSize-10);
+}
+
+function canMove(x,y){
+  if(grid[y][x]==='#') return false;
+  if(boxes.find(b=>b.x===x&&b.y===y)) return false;
+  return true;
+}
+
+function move(dx,dy){
+  const nx = player.x+dx;
+  const ny = player.y+dy;
+  const box = boxes.find(b=>b.x===nx&&b.y===ny);
+  if(box){
+    const bx = box.x+dx;
+    const by = box.y+dy;
+    if(grid[by][bx]==='#' || boxes.find(b=>b.x===bx&&b.y===by)) return;
+    box.x = bx; box.y = by;
+  }
+  if(canMove(nx,ny)){
+    player.x = nx; player.y = ny;
+    moves++;
+    movesEl.textContent = moves;
+    checkSwitches();
+    checkHazards();
+    checkExit();
+    draw();
+  }
+}
+
+function checkSwitches(){
+  for(let s of switches){
+    s.active = boxes.find(b=>b.x===s.x&&b.y===s.y)?true:false;
+    if(s.active){
+      // example: toggle adjacent walls
+      if(s.y>0 && grid[s.y-1][s.x]==='#') grid[s.y-1][s.x]='.';
+      if(s.y<grid.length-1 && grid[s.y+1][s.x]==='#') grid[s.y+1][s.x]='.';
+    }
+  }
+}
+
+function checkHazards(){
+  if(hazards.find(h=>h.x===player.x&&h.y===player.y)){
+    alert("💀 You hit a hazard! Restarting level.");
+    parseLevel(currentLevel);
+    draw();
+  }
+}
+
+function checkExit(){
+  if(player.x===exit.x && player.y===exit.y){
+    currentLevel++;
+    if(currentLevel>=levels.length){
+      gameOverText.textContent="🎉 You completed all levels! 🎉";
+      gameOverEl.style.display='flex';
+    } else {
+      parseLevel(currentLevel);
+      draw();
+    }
+  }
+}
+
+document.addEventListener('keydown', e=>{
+  if(gameOverEl.style.display==='none'){
+    if(e.key==='ArrowUp'||e.key==='w') move(0,-1);
+    if(e.key==='ArrowDown'||e.key==='s') move(0,1);
+    if(e.key==='ArrowLeft'||e.key==='a') move(-1,0);
+    if(e.key==='ArrowRight'||e.key==='d') move(1,0);
+  }
+});
+
+function restartGame(){
+  currentLevel = 0;
+  parseLevel(currentLevel);
+  gameOverEl.style.display='none';
+  draw();
+}
+
+parseLevel(currentLevel);
+draw();
+</script>
+</body>
+</html>

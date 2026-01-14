@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Potato Protector - FINAL POLISH</title>
+    <style>
+        body { margin: 0; background: #1a1a1a; color: #fff; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        #ui { position: absolute; top: 20px; left: 20px; pointer-events: none; z-index: 10; }
+        .stat-box { background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 8px; border: 2px solid #f1c40f; margin-bottom: 5px; }
+        canvas { display: block; cursor: crosshair; }
+        #game-over { 
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; background: rgba(0,0,0,0.9); padding: 40px; border-radius: 20px; border: 5px solid #e74c3c;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <div class="stat-box">Score: <span id="score">0</span></div>
+        <div class="stat-box">Hull Integrity: <span id="hp">100</span>%</div>
+    </div>
+
+    <div id="game-over">
+        <h1>MASHED POTATOES!</h1>
+        <p id="final-score"></p>
+        <button onclick="location.reload()" style="padding: 10px 20px; cursor: pointer; font-weight: bold;">REPLAY</button>
+    </div>
+
+    <canvas id="ctx"></canvas>
+
+<script>
+    const canvas = document.getElementById('ctx');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    let score = 0, hp = 100, frame = 0, gameActive = true;
+    const keys = {};
+
+    const player = {
+        x: canvas.width / 2, y: canvas.height / 2,
+        r: 25, speed: 5, color: '#d35400', skin: '#f39c12'
+    };
+
+    const bullets = [], enemies = [], particles = [];
+
+    window.onkeydown = e => keys[e.key.toLowerCase()] = true;
+    window.onkeyup = e => keys[e.key.toLowerCase()] = false;
+
+    let mouse = { x: 0, y: 0 };
+    window.onmousemove = e => { mouse.x = e.clientX; mouse.y = e.clientY; };
+    window.onmousedown = () => {
+        if(!gameActive) return;
+        const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+        bullets.push({ x: player.x, y: player.y, vx: Math.cos(angle) * 10, vy: Math.sin(angle) * 10 });
+    };
+
+    function spawnEnemy() {
+        if(!gameActive) return;
+        const size = 20;
+        let x, y;
+        if (Math.random() < 0.5) {
+            x = Math.random() < 0.5 ? -size : canvas.width + size;
+            y = Math.random() * canvas.height;
+        } else {
+            x = Math.random() * canvas.width;
+            y = Math.random() < 0.5 ? -size : canvas.height + size;
+        }
+        enemies.push({ x, y, r: size, hp: 1, speed: 1.5 + (score/500) });
+        setTimeout(spawnEnemy, Math.max(300, 1200 - (score * 2)));
+    }
+
+    function drawPotato(x, y, r, angle) {
+        // Body
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.fillStyle = player.skin;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r, r * 0.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#a04000';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Eyes (looking at mouse)
+        ctx.fillStyle = 'white';
+        ctx.beginPath(); ctx.arc(-8, -5, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(8, -5, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'black';
+        ctx.beginPath(); ctx.arc(-8, -5, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(8, -5, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+    }
+
+    function update() {
+        if(!gameActive) return;
+        ctx.fillStyle = '#3e2723'; // Soil color
+        ctx.fillRect(0,0, canvas.width, canvas.height);
+
+        // Movement
+        if(keys['w'] && player.y > player.r) player.y -= player.speed;
+        if(keys['s'] && player.y < canvas.height - player.r) player.y += player.speed;
+        if(keys['a'] && player.x > player.r) player.x -= player.speed;
+        if(keys['d'] && player.x < canvas.width - player.r) player.x += player.speed;
+
+        const angleToMouse = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+        drawPotato(player.x, player.y, player.r, angleToMouse);
+
+        // Bullets
+        bullets.forEach((b, i) => {
+            b.x += b.vx; b.y += b.vy;
+            ctx.fillStyle = '#f1c40f';
+            ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI*2); ctx.fill();
+            if(b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) bullets.splice(i, 1);
+        });
+
+        // Enemies (The Utensils)
+        enemies.forEach((en, i) => {
+            const ang = Math.atan2(player.y - en.y, player.x - en.x);
+            en.x += Math.cos(ang) * en.speed;
+            en.y += Math.sin(ang) * en.speed;
+
+            // Draw Knife/Fork
+            ctx.fillStyle = '#bdc3c7';
+            ctx.fillRect(en.x - 2, en.y - 15, 4, 30);
+            ctx.fillStyle = '#7f8c8d';
+            ctx.fillRect(en.x - 4, en.y + 10, 8, 10);
+
+            // Hit Player
+            if(Math.hypot(player.x - en.x, player.y - en.y) < player.r + en.r) {
+                enemies.splice(i, 1);
+                hp -= 10;
+                document.getElementById('hp').innerText = hp;
+                if(hp <= 0) {
+                    gameActive = false;
+                    document.getElementById('game-over').style.display = 'block';
+                    document.getElementById('final-score').innerText = "Score: " + score;
+                }
+            }
+
+            // Hit Bullet
+            bullets.forEach((b, bi) => {
+                if(Math.hypot(en.x - b.x, en.y - b.y) < en.r) {
+                    enemies.splice(i, 1);
+                    bullets.splice(bi, 1);
+                    score += 10;
+                    document.getElementById('score').innerText = score;
+                }
+            });
+        });
+
+        requestAnimationFrame(update);
+    }
+
+    spawnEnemy();
+    update();
+</script>
+</body>
+</html>

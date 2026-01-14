@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Shadow Maze – Absolute Final</title>
+<style>
+body {
+    margin: 0;
+    background: black;
+    overflow: hidden;
+    font-family: monospace;
+    color: #0f0;
+}
+canvas { display:block; }
+#ui {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+}
+#center {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+#center div {
+    border: 2px solid #0f0;
+    padding: 20px 30px;
+    background: rgba(0,0,0,0.85);
+}
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div id="ui">SONAR: <span id="sonar">READY</span></div>
+<div id="center"><div id="msg">SHADOW MAZE<br><br>WASD / Arrows to move<br>SPACE = Sonar Pulse<br><br>Click to Start</div></div>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+function resize(){ canvas.width=innerWidth; canvas.height=innerHeight; }
+resize(); addEventListener("resize", resize);
+
+const TILE = 28;
+const COLS = Math.floor(canvas.width / TILE);
+const ROWS = Math.floor(canvas.height / TILE);
+const VIEW_RADIUS = 6;
+
+let maze, state="menu", sonar=0, reveal=0;
+
+const player={x:1,y:1};
+const hunter={x:0,y:0,path:[],active:false};
+const exit={x:COLS-2,y:ROWS-2};
+
+function genMaze(){
+    maze=Array.from({length:ROWS},()=>Array(COLS).fill(1));
+    function carve(x,y){
+        maze[y][x]=0;
+        [[1,0],[-1,0],[0,1],[0,-1]].sort(()=>Math.random()-0.5)
+        .forEach(([dx,dy])=>{
+            let nx=x+dx*2, ny=y+dy*2;
+            if(ny>0&&ny<ROWS-1&&nx>0&&nx<COLS-1&&maze[ny][nx]){
+                maze[y+dy][x+dx]=0;
+                carve(nx,ny);
+            }
+        });
+    }
+    carve(1,1);
+}
+
+function reset(){
+    genMaze();
+    player.x=1; player.y=1;
+    hunter.x=COLS-2; hunter.y=ROWS-2;
+    hunter.active=false;
+    sonar=0; reveal=0;
+    state="play";
+    msg.textContent="";
+}
+
+onclick=()=>state!=="play"&&reset();
+
+onkeydown=e=>{
+if(state!=="play")return;
+let dx=0,dy=0;
+if(e.key==="ArrowUp"||e.key==="w")dy=-1;
+if(e.key==="ArrowDown"||e.key==="s")dy=1;
+if(e.key==="ArrowLeft"||e.key==="a")dx=-1;
+if(e.key==="ArrowRight"||e.key==="d")dx=1;
+if(dx||dy){
+    if(!maze[player.y+dy]?.[player.x+dx]){
+        player.x+=dx; player.y+=dy;
+        hunter.active=true;
+    }
+}
+if(e.code==="Space"&&sonar<=0){
+    sonar=300;
+    reveal=120;
+    hunter.active=true;
+}
+};
+
+function bfs(sx,sy,tx,ty){
+    let q=[[sx,sy]], prev={}, key=(x,y)=>x+","+y;
+    prev[key(sx,sy)]=null;
+    while(q.length){
+        let [x,y]=q.shift();
+        if(x===tx&&y===ty)break;
+        for(let[dX,dY]of[[1,0],[-1,0],[0,1],[0,-1]]){
+            let nx=x+dX, ny=y+dY;
+            let k=key(nx,ny);
+            if(!maze[ny]?.[nx] && !(k in prev)){
+                prev[k]=[x,y];
+                q.push([nx,ny]);
+            }
+        }
+    }
+    let path=[], cur=[tx,ty];
+    while(cur){ path.push(cur); cur=prev[key(cur[0],cur[1])]; }
+    return path.reverse();
+}
+
+function update(){
+requestAnimationFrame(update);
+ctx.clearRect(0,0,canvas.width,canvas.height);
+
+if(state==="play"){
+    if(hunter.active && Math.random()<0.04){
+        hunter.path=bfs(hunter.x,hunter.y,player.x,player.y);
+        if(hunter.path[1]){
+            hunter.x=hunter.path[1][0];
+            hunter.y=hunter.path[1][1];
+        }
+    }
+
+    if(player.x===hunter.x&&player.y===hunter.y){
+        state="menu";
+        msg.textContent="YOU WERE CAUGHT\n\nClick to Retry";
+    }
+    if(player.x===exit.x&&player.y===exit.y){
+        state="menu";
+        msg.textContent="YOU ESCAPED\n\nClick to Play Again";
+    }
+
+    sonar--;
+    document.getElementById("sonar").textContent=sonar<=0?"READY":"RECHARGING";
+}
+
+// Draw ONLY visible maze tiles
+for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    let d=Math.hypot(x-player.x,y-player.y);
+    if(d<VIEW_RADIUS || reveal>0){
+        let g=d<VIEW_RADIUS?120:60;
+        ctx.fillStyle=maze[y][x]?`rgb(0,${g/2},0)`:`rgb(0,${g},0)`;
+        ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
+    }
+}
+
+// Exit (sonar only)
+if(reveal>0){
+    ctx.fillStyle="#0ff";
+    ctx.fillRect(exit.x*TILE+6,exit.y*TILE+6,TILE-12,TILE-12);
+    reveal--;
+}
+
+// Player
+ctx.fillStyle="#0f0";
+ctx.fillRect(player.x*TILE+6,player.y*TILE+6,TILE-12,TILE-12);
+
+// Hunter visibility
+let dToHunter=Math.hypot(hunter.x-player.x,hunter.y-player.y);
+if(reveal>0 || dToHunter<VIEW_RADIUS){
+    ctx.fillStyle="#f00";
+    ctx.fillRect(hunter.x*TILE+6,hunter.y*TILE+6,TILE-12,TILE-12);
+}
+}
+
+update();
+</script>
+</body>
+</html>

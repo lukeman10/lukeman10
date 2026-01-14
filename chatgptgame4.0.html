@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>🛠️ 3D Props Arena 🛠️</title>
+<style>
+  body { margin:0; overflow:hidden; background:#111; cursor: grab; }
+  #hud {
+    position:fixed; top:10px; left:10px; color:#fff; font-family:Arial,sans-serif;
+    font-size:18px; z-index:10;
+  }
+</style>
+</head>
+<body>
+<div id="hud">Drag mouse to rotate camera. Click props to interact!</div>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+const w = canvas.width/2, h = canvas.height/2;
+
+// 3D projection parameters
+const fov = 500;
+let cameraAngleX = 0, cameraAngleY = 0;
+
+// Mouse rotation
+let dragging=false, lastX=0, lastY=0;
+canvas.addEventListener('mousedown', e=>{dragging=true; lastX=e.clientX; lastY=e.clientY;});
+canvas.addEventListener('mouseup', e=>dragging=false);
+canvas.addEventListener('mousemove', e=>{
+  if(dragging){
+    cameraAngleY += (e.clientX-lastX)*0.005;
+    cameraAngleX += (e.clientY-lastY)*0.005;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  }
+});
+
+// 3D vector
+class Vec3 { constructor(x,y,z){this.x=x;this.y=y;this.z=z;} }
+function rotate(v, ax, ay){
+  let cosX=Math.cos(ax), sinX=Math.sin(ax);
+  let cosY=Math.cos(ay), sinY=Math.sin(ay);
+  let y=v.y*cosX - v.z*sinX;
+  let z=v.y*sinX + v.z*cosX;
+  let x=v.x*cosY + z*sinY;
+  z=-v.x*sinY + z*cosY;
+  return new Vec3(x,y,z);
+}
+function project(v){ return {x: w + fov*v.x/(v.z+fov+200), y: h - fov*v.y/(v.z+fov+200)}; }
+
+// 3D props
+class Prop {
+  constructor(x,y,z, type){
+    this.pos = new Vec3(x,y,z);
+    this.type = type; // cube, pyramid, sphere
+    this.size = 50;
+    this.color = '#'+Math.floor(Math.random()*0xffffff).toString(16);
+    this.angle = 0;
+  }
+  draw(){
+    const p = rotate(this.pos, cameraAngleX, cameraAngleY);
+    const screen = project(p);
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    if(this.type==='cube'){
+      ctx.rect(screen.x - this.size/2, screen.y - this.size/2, this.size, this.size);
+    } else if(this.type==='pyramid'){
+      ctx.moveTo(screen.x, screen.y - this.size/2);
+      ctx.lineTo(screen.x - this.size/2, screen.y + this.size/2);
+      ctx.lineTo(screen.x + this.size/2, screen.y + this.size/2);
+      ctx.closePath();
+    } else if(this.type==='sphere'){
+      ctx.arc(screen.x, screen.y, this.size/2, 0, Math.PI*2);
+    }
+    ctx.fill();
+  }
+  contains(mx,my){
+    const p = rotate(this.pos, cameraAngleX, cameraAngleY);
+    const screen = project(p);
+    return mx > screen.x - this.size/2 && mx < screen.x + this.size/2 &&
+           my > screen.y - this.size/2 && my < screen.y + this.size/2;
+  }
+  interact(){
+    this.color = '#'+Math.floor(Math.random()*0xffffff).toString(16);
+    this.size = 30 + Math.random()*70;
+  }
+}
+
+const props = [];
+for(let i=0;i<12;i++){
+  const types = ['cube','pyramid','sphere'];
+  props.push(new Prop(Math.random()*600-300, Math.random()*600-300, Math.random()*600-300, types[Math.floor(Math.random()*3)]));
+}
+
+// Click interaction
+canvas.addEventListener('click', e=>{
+  for(let p of props){
+    if(p.contains(e.clientX,e.clientY)){
+      p.interact();
+      break;
+    }
+  }
+});
+
+function animate(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(let p of props) p.draw();
+  requestAnimationFrame(animate);
+}
+animate();
+</script>
+</body>
+</html>
