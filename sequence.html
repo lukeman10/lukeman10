@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Input</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div>
+    <input type="text" id="seq" autocomplete="off" placeholder="...">
+</div>
+
+<script>
+document.getElementById("seq").addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+        const value = e.target.value
+            .toUpperCase()
+            .replace(/[^A-Z]/g, "");
+
+        if (value.includes("A") && value.includes("K") && value.includes("O")) {
+            window.location.href =
+              "https://en.wikipedia.org/wiki/Konami_Code";
+        } else {
+            e.target.value = "";
+        }
+    }
+});
+</script>
+
+</body>
+</html>

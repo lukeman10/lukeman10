@@ -94,3 +94,16 @@ h1 {
     list-style-type: none;
 }
 
+#secret-link {
+    position: fixed;
+    bottom: 5px;
+    right: 5px;
+    font-size: 50px;
+    color: rgba(0, 176, 0, 0.15); /* almost background */
+    text-decoration: none;
+    user-select: none;
+}
+
+#secret-link:hover {
+    color: rgba(0, 176, 0, 0.6); /* slightly visible on hover */
+}

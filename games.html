@@ -1,29 +1,94 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <title>Games</title>
-        <link rel="icon" type="image/x-icon" href="L.png">
-        <link rel="stylesheet" href="styles.css">
-        <h1>About</h1>
-    </head>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Games</title>
+    <link rel="icon" type="image/x-icon" href="L.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
 
-    <body>
-        <ul class="navbar">
-            <li><a href="index.html">Home</a></li>
-            <li><a href="about.html">About</a></li>
-            <li><a href="other.html">Other</a></li>
-            <li><a href="games.html">Games</a></li>
-        </ul>
+    <h1>Games</h1>
 
-        <ul class="games-list">
-            <li><div><a href="snake.html">Simple snake game.</a></div></li>
-            <li><div><a href="tetris.html">Tetris game</a></div></li>
-        </ul>
-        <div>
-            Recently I put ChatGPT and Gemini against each other to see who could make the best game. Ultimatly, ChatGPT won. Here are the games:
-            <a href="chatgptgame.html">ChatGPT's game</a>
-            <a href="geminigame.html">Gemini's game</a>
-        </div>
+    <ul class="navbar">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="other.html">Other</a></li>
+        <li><a href="games.html">Games</a></li>
+    </ul>
 
-    </body>
+    <ul class="games-list">
+        <li><div><a href="snake.html">Simple snake game.</a></div></li>
+        <li><div><a href="tetris.html">Tetris game</a></div></li>
+        <!-- ParadoxPrism link, hidden by default -->
+        <li id="paradox-link" style="display:none;">
+            <div><a href="ParadoxPrism.html">Paradox Prism</a></div>
+        </li>
+    </ul>
+
+    <div>
+        Recently I put ChatGPT and Gemini against each other tO see who could maKe the best game. 
+        UltimAtly, ChatGPT won. Here are the games:
+        <a href="chatgptgame.html">ChatGPT's game</a>
+        <a href="geminigame.html">Gemini's game</a>
+    </div>
+
+    <!-- Hidden dot that appears every 5th visit -->
+    <a href="sequence.html" id="secret-link">.</a>
+
+    <script>
+        // -------------------------------
+        // Secret dot logic
+        // -------------------------------
+        let visits = Number(localStorage.getItem("visitCount") || 0);
+        visits++;
+        localStorage.setItem("visitCount", visits);
+
+        const dot = document.getElementById("secret-link");
+        if (visits % 5 !== 0) {
+            dot.style.display = "none";
+        }
+    </script>
+
+    <script>
+        // -------------------------------
+        // Konami Code listener
+        // -------------------------------
+        const konami = [
+            "ArrowUp","ArrowUp","ArrowDown","ArrowDown",
+            "ArrowLeft","ArrowRight","ArrowLeft","ArrowRight",
+            "b","a"
+        ];
+
+        let buffer = [];
+
+        window.addEventListener("keydown", e => {
+            // ignore typing in input fields
+            if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+
+            let key = e.key;
+            // normalize letters to lowercase
+            if (key.length === 1) key = key.toLowerCase();
+
+            buffer.push(key);
+            buffer.splice(-konami.length, buffer.length - konami.length);
+
+            if (buffer.join() === konami.join()) {
+                localStorage.setItem("paradoxUnlocked", "true");
+                alert("Paradox Prism unlocked!");
+                location.reload();
+            }
+        });
+    </script>
+
+    <script>
+        // -------------------------------
+        // Show ParadoxPrism link if unlocked
+        // -------------------------------
+        if (localStorage.getItem("paradoxUnlocked") === "true") {
+            document.getElementById("paradox-link").style.display = "block";
+        }
+    </script>
+
+</body>
 </html>
