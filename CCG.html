@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monster Card Collector</title>
+<style>
+body { font-family:sans-serif; background:#222; color:#fff; text-align:center; margin:0; padding:0; }
+h1 { margin-top:20px; }
+#cooldown { margin: 10px 0; font-size:16px; }
+#boosterButtons { margin-bottom:20px; }
+button { margin:5px; padding:10px 20px; font-size:16px; border:none; border-radius:10px; cursor:pointer; }
+button:disabled { background:#555; cursor:not-allowed; }
+#cards { display:flex; flex-wrap:wrap; justify-content:center; }
+canvas.card { width:100px; height:140px; margin:5px; border-radius:10px; background:#333; }
+h2 { width:100%; text-align:left; margin-left:20px; }
+</style>
+</head>
+<body>
+<h1>Monster Card Collector</h1>
+<div id="cooldown">Next booster available: 0:00</div>
+<div id="boosterButtons"></div>
+<div id="cards"></div>
+
+<script>
+// --- VERSION CHECK ---
+const COLLECTION_VERSION = 2;
+if (parseInt(localStorage.getItem("collectionVersion")||0) < COLLECTION_VERSION) {
+    localStorage.removeItem("cardCollection");
+    localStorage.removeItem("nextBooster");
+    localStorage.setItem("collectionVersion", COLLECTION_VERSION);
+}
+
+// --- GLOBAL VARIABLES ---
+let cards = [];
+let collection = JSON.parse(localStorage.getItem("cardCollection")) || [];
+let nextBooster = parseInt(localStorage.getItem("nextBooster") || 0);
+const COOLDOWN_MS = 10*60*1000;
+
+const cooldownEl = document.getElementById("cooldown");
+const boosterDiv = document.getElementById("boosterButtons");
+const cardsContainer = document.getElementById("cards");
+
+// --- LOAD CARDS JSON ---
+fetch('cards.json')
+  .then(res => res.json())
+  .then(data => {
+      cards = data;
+      setupBoosterButtons();
+      updateCollectionUI();
+  })
+  .catch(err => console.error("Failed to load cards.json", err));
+
+// --- SETUP BOOSTER BUTTONS (one per series) ---
+function setupBoosterButtons() {
+    const seriesList = [...new Set(cards.map(c => c.series))];
+    seriesList.forEach(series => {
+        const btn = document.createElement("button");
+        btn.id = `btn-${series}`;
+        btn.innerText = `Open ${series} Pack`;
+        btn.addEventListener("click", ()=> openSeriesPack(series));
+        boosterDiv.appendChild(btn);
+    });
+}
+
+// --- COOLDOWN TIMER ---
+setInterval(()=>{
+    const remaining = nextBooster - Date.now();
+    const disabled = remaining > 0;
+    const seriesList = [...new Set(cards.map(c => c.series))];
+    seriesList.forEach(series => document.getElementById(`btn-${series}`).disabled = disabled);
+
+    const mins = Math.floor(Math.max(remaining,0)/60000);
+    const secs = Math.floor((Math.max(remaining,0)%60000)/1000);
+    cooldownEl.innerText = remaining > 0 ? `Next booster available: ${mins}:${secs.toString().padStart(2,"0")}` : "Booster available!";
+},1000);
+
+// --- OPEN SERIES BOOSTER ---
+function openSeriesPack(series) {
+    if(Date.now() < nextBooster) return; // still on cooldown
+    const seriesCards = cards.filter(c=>c.series===series);
+    const pack = [];
+    const packSize = 5;
+
+    for(let i=0;i<packSize;i++){
+        pack.push(getRandomCardFromSeries(seriesCards));
+    }
+
+    collection = [...collection, ...pack];
+    localStorage.setItem("cardCollection", JSON.stringify(collection));
+
+    nextBooster = Date.now() + COOLDOWN_MS;
+    localStorage.setItem("nextBooster", nextBooster);
+
+    updateCollectionUI();
+
+    alert(`You opened a ${series} pack:\n` + pack.map(c=>`${c.name} (${c.rarity})`).join("\n"));
+}
+
+// --- RANDOM CARD BASED ON RARITY ---
+function getRandomCardFromSeries(seriesCards) {
+    const rand = Math.random();
+    let rarity;
+    if(rand<0.5) rarity="Common";
+    else if(rand<0.75) rarity="Uncommon";
+    else if(rand<0.9) rarity="Rare";
+    else if(rand<0.98) rarity="Epic";
+    else rarity="Legendary";
+
+    const possible = seriesCards.filter(c=>c.rarity===rarity);
+    if(possible.length === 0) return seriesCards[Math.floor(Math.random()*seriesCards.length)];
+    return possible[Math.floor(Math.random()*possible.length)];
+}
+
+// --- UPDATE COLLECTION UI (group by series) ---
+function updateCollectionUI(){
+    cardsContainer.innerHTML = "";
+    const seriesList = [...new Set(collection.map(c => c.series))];
+
+    seriesList.forEach(series => {
+        // Unique cards in this series
+        const seriesCards = collection.filter(c => c.series === series);
+        const uniqueCardsMap = {};
+        seriesCards.forEach(c => {
+            if(!uniqueCardsMap[c.id]) uniqueCardsMap[c.id] = { card: c, count: 0 };
+            uniqueCardsMap[c.id].count++;
+        });
+
+        // Header with collected/total
+        const uniqueCount = Object.keys(uniqueCardsMap).length;
+        const totalInSeries = cards.filter(c => c.series === series).length;
+        const header = document.createElement("h2");
+        header.innerText = `${series} (${uniqueCount}/${totalInSeries})`;
+        cardsContainer.appendChild(header);
+
+        // Draw each unique card once, pass count for duplicates
+        Object.values(uniqueCardsMap).forEach(entry => drawCanvasCard(cardsContainer, entry.card, entry.count));
+    });
+}
+
+
+// --- DRAW CARD ON CANVAS ---
+function drawCanvasCard(container, card, count=1){
+    const canvas = document.createElement("canvas");
+    canvas.classList.add("card");
+    canvas.width = 100;
+    canvas.height = 140;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // Draw shape
+    ctx.fillStyle = card.color;
+    const cx = canvas.width/2, cy = canvas.height/2, size = 30;
+    ctx.beginPath();
+    switch(card.shape){
+        case "circle": ctx.arc(cx,cy,size,0,2*Math.PI); ctx.fill(); break;
+        case "triangle": ctx.moveTo(cx,cy-size); ctx.lineTo(cx-size,cy+size); ctx.lineTo(cx+size,cy+size); ctx.closePath(); ctx.fill(); break;
+        case "diamond": ctx.moveTo(cx,cy-size); ctx.lineTo(cx-size,cy); ctx.lineTo(cx,cy+size); ctx.lineTo(cx+size,cy); ctx.closePath(); ctx.fill(); break;
+    }
+
+    // Draw card text
+    ctx.fillStyle = "#fff";
+    ctx.font = "10px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(card.name, cx, canvas.height-30);
+    ctx.fillText(card.rarity, cx, canvas.height-18);
+    ctx.fillText(`S:${card.series} #${card.numberInSeries}`, cx, canvas.height-6);
+
+    // Draw duplicates count on top-left corner
+// Draw duplicates count OR NEW badge
+    if (count > 1){
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 12px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(`x${count}`, 5, 15);
+    } else {
+        ctx.fillStyle = "gold";
+        ctx.font = "bold 12px sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText("NEW", canvas.width - 5, 15);
+    }
+
+
+    container.appendChild(canvas);
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+[
+  {"id":1,"name":"Slime","rarity":"Common","color":"#2ecc71","shape":"circle","series":"Alpha","numberInSeries":1},
+  {"id":2,"name":"Goblin","rarity":"Common","color":"#27ae60","shape":"triangle","series":"Alpha","numberInSeries":2},
+  {"id":3,"name":"Bat","rarity":"Uncommon","color":"#8e44ad","shape":"triangle","series":"Alpha","numberInSeries":3},
+  {"id":4,"name":"Wolf","rarity":"Uncommon","color":"#34495e","shape":"circle","series":"Alpha","numberInSeries":4},
+  {"id":5,"name":"Dragon","rarity":"Rare","color":"#e67e22","shape":"diamond","series":"Alpha","numberInSeries":5},
+  {"id":6,"name":"Phoenix","rarity":"Rare","color":"#e74c3c","shape":"triangle","series":"Alpha","numberInSeries":6},
+  {"id":7,"name":"Unicorn","rarity":"Epic","color":"#9b59b6","shape":"circle","series":"Alpha","numberInSeries":7},
+  {"id":8,"name":"Kraken","rarity":"Epic","color":"#2980b9","shape":"diamond","series":"Alpha","numberInSeries":8},
+  {"id":9,"name":"Demon","rarity":"Legendary","color":"#c0392b","shape":"triangle","series":"Alpha","numberInSeries":9},
+  {"id":10,"name":"Titan","rarity":"Legendary","color":"#f1c40f","shape":"circle","series":"Alpha","numberInSeries":10},
+
+  {"id":11,"name":"Mermaid","rarity":"Common","color":"#1abc9c","shape":"circle","series":"Beta","numberInSeries":1},
+  {"id":12,"name":"Sea Serpent","rarity":"Uncommon","color":"#16a085","shape":"diamond","series":"Beta","numberInSeries":2},
+  {"id":13,"name":"Kraken Jr","rarity":"Rare","color":"#2980b9","shape":"circle","series":"Beta","numberInSeries":3},
+  {"id":14,"name":"Poseidon","rarity":"Epic","color":"#3498db","shape":"triangle","series":"Beta","numberInSeries":4},
+  {"id":15,"name":"Leviathan","rarity":"Legendary","color":"#2c3e50","shape":"diamond","series":"Beta","numberInSeries":5}
+]
