@@ -4,186 +4,329 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monster Card Collector</title>
+
 <style>
-body { font-family:sans-serif; background:#222; color:#fff; text-align:center; margin:0; padding:0; }
-h1 { margin-top:20px; }
-#cooldown { margin: 10px 0; font-size:16px; }
-#boosterButtons { margin-bottom:20px; }
-button { margin:5px; padding:10px 20px; font-size:16px; border:none; border-radius:10px; cursor:pointer; }
-button:disabled { background:#555; cursor:not-allowed; }
-#cards { display:flex; flex-wrap:wrap; justify-content:center; }
-canvas.card { width:100px; height:140px; margin:5px; border-radius:10px; background:#333; }
-h2 { width:100%; text-align:left; margin-left:20px; }
+body {
+  font-family: sans-serif;
+  background: #222;
+  color: #fff;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+}
+
+h1 { margin-top: 20px; }
+
+#cooldown { margin: 10px 0; font-size: 16px; }
+
+#boosterButtons { margin-bottom: 20px; }
+
+button {
+  margin: 5px;
+  padding: 10px 20px;
+  font-size: 16px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #555;
+  cursor: not-allowed;
+}
+
+#cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+canvas.card {
+  width: 100px;
+  height: 140px;
+  margin: 5px;
+  border-radius: 10px;
+  background: #333;
+  touch-action: manipulation;
+}
+
+h2 {
+  width: 100%;
+  text-align: left;
+  margin-left: 20px;
+}
+
+/* -------- DUPLICATE MODAL -------- */
+
+#dupeModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+#dupeContent {
+  background: #111;
+  padding: 20px;
+  border-radius: 16px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+#dupeCards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.closeBtn {
+  margin-top: 10px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  background: #444;
+  color: #fff;
+}
 </style>
 </head>
+
 <body>
+
 <h1>Monster Card Collector</h1>
 <div id="cooldown">Next booster available: 0:00</div>
 <div id="boosterButtons"></div>
 <div id="cards"></div>
 
+<!-- DUPLICATE MODAL -->
+<div id="dupeModal">
+  <div id="dupeContent">
+    <h3 id="dupeTitle"></h3>
+    <div id="dupeCards"></div>
+    <button class="closeBtn" onclick="closeDupeModal()">Close</button>
+  </div>
+</div>
+
 <script>
-// --- VERSION CHECK ---
+// ---------- VERSION RESET ----------
 const COLLECTION_VERSION = 2;
-if (parseInt(localStorage.getItem("collectionVersion")||0) < COLLECTION_VERSION) {
-    localStorage.removeItem("cardCollection");
-    localStorage.removeItem("nextBooster");
-    localStorage.setItem("collectionVersion", COLLECTION_VERSION);
+if ((parseInt(localStorage.getItem("collectionVersion")) || 0) < COLLECTION_VERSION) {
+  localStorage.removeItem("cardCollection");
+  localStorage.removeItem("nextBooster");
+  localStorage.setItem("collectionVersion", COLLECTION_VERSION);
 }
 
-// --- GLOBAL VARIABLES ---
+// ---------- GLOBALS ----------
 let cards = [];
 let collection = JSON.parse(localStorage.getItem("cardCollection")) || [];
 let nextBooster = parseInt(localStorage.getItem("nextBooster") || 0);
-const COOLDOWN_MS = 10*60*1000;
+const COOLDOWN_MS = 10 * 60 * 1000;
 
 const cooldownEl = document.getElementById("cooldown");
 const boosterDiv = document.getElementById("boosterButtons");
 const cardsContainer = document.getElementById("cards");
 
-// --- LOAD CARDS JSON ---
-fetch('cards.json')
+const dupeModal = document.getElementById("dupeModal");
+const dupeCardsDiv = document.getElementById("dupeCards");
+const dupeTitle = document.getElementById("dupeTitle");
+
+// ---------- LOAD CARDS ----------
+fetch("cards.json")
   .then(res => res.json())
   .then(data => {
-      cards = data;
-      setupBoosterButtons();
-      updateCollectionUI();
-  })
-  .catch(err => console.error("Failed to load cards.json", err));
-
-// --- SETUP BOOSTER BUTTONS (one per series) ---
-function setupBoosterButtons() {
-    const seriesList = [...new Set(cards.map(c => c.series))];
-    seriesList.forEach(series => {
-        const btn = document.createElement("button");
-        btn.id = `btn-${series}`;
-        btn.innerText = `Open ${series} Pack`;
-        btn.addEventListener("click", ()=> openSeriesPack(series));
-        boosterDiv.appendChild(btn);
-    });
-}
-
-// --- COOLDOWN TIMER ---
-setInterval(()=>{
-    const remaining = nextBooster - Date.now();
-    const disabled = remaining > 0;
-    const seriesList = [...new Set(cards.map(c => c.series))];
-    seriesList.forEach(series => document.getElementById(`btn-${series}`).disabled = disabled);
-
-    const mins = Math.floor(Math.max(remaining,0)/60000);
-    const secs = Math.floor((Math.max(remaining,0)%60000)/1000);
-    cooldownEl.innerText = remaining > 0 ? `Next booster available: ${mins}:${secs.toString().padStart(2,"0")}` : "Booster available!";
-},1000);
-
-// --- OPEN SERIES BOOSTER ---
-function openSeriesPack(series) {
-    if(Date.now() < nextBooster) return; // still on cooldown
-    const seriesCards = cards.filter(c=>c.series===series);
-    const pack = [];
-    const packSize = 5;
-
-    for(let i=0;i<packSize;i++){
-        pack.push(getRandomCardFromSeries(seriesCards));
-    }
-
-    collection = [...collection, ...pack];
-    localStorage.setItem("cardCollection", JSON.stringify(collection));
-
-    nextBooster = Date.now() + COOLDOWN_MS;
-    localStorage.setItem("nextBooster", nextBooster);
-
+    cards = data;
+    setupBoosterButtons();
     updateCollectionUI();
+  });
 
-    alert(`You opened a ${series} pack:\n` + pack.map(c=>`${c.name} (${c.rarity})`).join("\n"));
+// ---------- BOOSTER BUTTONS ----------
+function setupBoosterButtons(){
+  const seriesList = [...new Set(cards.map(c => c.series))];
+  seriesList.forEach(series => {
+    const btn = document.createElement("button");
+    btn.id = `btn-${series}`;
+    btn.innerText = `Open ${series} Pack`;
+    btn.onclick = () => openSeriesPack(series);
+    boosterDiv.appendChild(btn);
+  });
 }
 
-// --- RANDOM CARD BASED ON RARITY ---
-function getRandomCardFromSeries(seriesCards) {
-    const rand = Math.random();
-    let rarity;
-    if(rand<0.5) rarity="Common";
-    else if(rand<0.75) rarity="Uncommon";
-    else if(rand<0.9) rarity="Rare";
-    else if(rand<0.98) rarity="Epic";
-    else rarity="Legendary";
+// ---------- COOLDOWN ----------
+setInterval(() => {
+  const remaining = nextBooster - Date.now();
+  const disabled = remaining > 0;
+  const seriesList = [...new Set(cards.map(c => c.series))];
 
-    const possible = seriesCards.filter(c=>c.rarity===rarity);
-    if(possible.length === 0) return seriesCards[Math.floor(Math.random()*seriesCards.length)];
-    return possible[Math.floor(Math.random()*possible.length)];
+  seriesList.forEach(series => {
+    const btn = document.getElementById(`btn-${series}`);
+    if (btn) btn.disabled = disabled;
+  });
+
+  const mins = Math.floor(Math.max(remaining,0)/60000);
+  const secs = Math.floor((Math.max(remaining,0)%60000)/1000);
+  cooldownEl.innerText = remaining > 0
+    ? `Next booster available: ${mins}:${secs.toString().padStart(2,"0")}`
+    : "Booster available!";
+}, 1000);
+
+// ---------- OPEN PACK ----------
+function openSeriesPack(series){
+  if (Date.now() < nextBooster) return;
+
+  const seriesCards = cards.filter(c => c.series === series);
+  const pack = [];
+
+  for (let i=0;i<5;i++){
+    pack.push(getRandomCardFromSeries(seriesCards));
+  }
+
+  collection.push(...pack);
+  localStorage.setItem("cardCollection", JSON.stringify(collection));
+
+  nextBooster = Date.now() + COOLDOWN_MS;
+  localStorage.setItem("nextBooster", nextBooster);
+
+  updateCollectionUI();
+  alert(`You opened a ${series} pack:\n` +
+    pack.map(c => `${c.name} (${c.rarity})`).join("\n"));
 }
 
-// --- UPDATE COLLECTION UI (group by series) ---
+// ---------- RARITY ----------
+function getRandomCardFromSeries(seriesCards){
+  const r = Math.random();
+  let rarity =
+    r < 0.5 ? "Common" :
+    r < 0.75 ? "Uncommon" :
+    r < 0.9 ? "Rare" :
+    r < 0.98 ? "Epic" : "Legendary";
+
+  const pool = seriesCards.filter(c => c.rarity === rarity);
+  return pool.length
+    ? pool[Math.floor(Math.random()*pool.length)]
+    : seriesCards[Math.floor(Math.random()*seriesCards.length)];
+}
+
+// ---------- UI ----------
 function updateCollectionUI(){
-    cardsContainer.innerHTML = "";
-    const seriesList = [...new Set(collection.map(c => c.series))];
+  cardsContainer.innerHTML = "";
+  const seriesList = [...new Set(collection.map(c => c.series))];
 
-    seriesList.forEach(series => {
-        // Unique cards in this series
-        const seriesCards = collection.filter(c => c.series === series);
-        const uniqueCardsMap = {};
-        seriesCards.forEach(c => {
-            if(!uniqueCardsMap[c.id]) uniqueCardsMap[c.id] = { card: c, count: 0 };
-            uniqueCardsMap[c.id].count++;
-        });
+  seriesList.forEach(series => {
+    const seriesCards = collection.filter(c => c.series === series);
+    const map = {};
 
-        // Header with collected/total
-        const uniqueCount = Object.keys(uniqueCardsMap).length;
-        const totalInSeries = cards.filter(c => c.series === series).length;
-        const header = document.createElement("h2");
-        header.innerText = `${series} (${uniqueCount}/${totalInSeries})`;
-        cardsContainer.appendChild(header);
-
-        // Draw each unique card once, pass count for duplicates
-        Object.values(uniqueCardsMap).forEach(entry => drawCanvasCard(cardsContainer, entry.card, entry.count));
+    seriesCards.forEach(c => {
+      if (!map[c.id]) map[c.id] = { card: c, count: 0 };
+      map[c.id].count++;
     });
+
+    const header = document.createElement("h2");
+    header.innerText =
+      `${series} (${Object.keys(map).length}/${cards.filter(c=>c.series===series).length})`;
+    cardsContainer.appendChild(header);
+
+    Object.values(map).forEach(e =>
+      drawCanvasCard(cardsContainer, e.card, e.count)
+    );
+  });
 }
 
+// ---------- DRAW CARD ----------
+function drawCanvasCard(container, card, count){
+  const canvas = document.createElement("canvas");
+  canvas.className = "card";
+  canvas.width = 100;
+  canvas.height = 140;
 
-// --- DRAW CARD ON CANVAS ---
-function drawCanvasCard(container, card, count=1){
-    const canvas = document.createElement("canvas");
-    canvas.classList.add("card");
-    canvas.width = 100;
-    canvas.height = 140;
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+  const ctx = canvas.getContext("2d");
+  drawShape(ctx, card.color, card.shape);
 
-    // Draw shape
-    ctx.fillStyle = card.color;
-    const cx = canvas.width/2, cy = canvas.height/2, size = 30;
-    ctx.beginPath();
-    switch(card.shape){
-        case "circle": ctx.arc(cx,cy,size,0,2*Math.PI); ctx.fill(); break;
-        case "triangle": ctx.moveTo(cx,cy-size); ctx.lineTo(cx-size,cy+size); ctx.lineTo(cx+size,cy+size); ctx.closePath(); ctx.fill(); break;
-        case "diamond": ctx.moveTo(cx,cy-size); ctx.lineTo(cx-size,cy); ctx.lineTo(cx,cy+size); ctx.lineTo(cx+size,cy); ctx.closePath(); ctx.fill(); break;
-    }
+  ctx.fillStyle = "#fff";
+  ctx.font = "10px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(card.name, 50, 110);
+  ctx.fillText(card.rarity, 50, 122);
 
-    // Draw card text
-    ctx.fillStyle = "#fff";
-    ctx.font = "10px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(card.name, cx, canvas.height-30);
-    ctx.fillText(card.rarity, cx, canvas.height-18);
-    ctx.fillText(`S:${card.series} #${card.numberInSeries}`, cx, canvas.height-6);
+  if (count > 1) {
+    ctx.font = "bold 12px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(`x${count}`, 5, 15);
+    canvas.onclick = () => showDuplicates(card, count);
+  } else {
+    ctx.fillStyle = "gold";
+    ctx.textAlign = "right";
+    ctx.fillText("NEW", 95, 15);
+  }
 
-    // Draw duplicates count on top-left corner
-// Draw duplicates count OR NEW badge
-    if (count > 1){
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 12px sans-serif";
-        ctx.textAlign = "left";
-        ctx.fillText(`x${count}`, 5, 15);
-    } else {
-        ctx.fillStyle = "gold";
-        ctx.font = "bold 12px sans-serif";
-        ctx.textAlign = "right";
-        ctx.fillText("NEW", canvas.width - 5, 15);
-    }
-
-
-    container.appendChild(canvas);
+  container.appendChild(canvas);
 }
 
+// ---------- DUPLICATES ----------
+function showDuplicates(card, count){
+  dupeCardsDiv.innerHTML = "";
+  dupeTitle.innerText = `${card.name} – ${count} copies`;
+
+  for (let i=0;i<count;i++){
+    drawVariantCard(dupeCardsDiv, card, i);
+  }
+
+  dupeModal.style.display = "flex";
+}
+
+function closeDupeModal(){
+  dupeModal.style.display = "none";
+  dupeCardsDiv.innerHTML = "";
+}
+
+// ---------- VARIANT DRAW ----------
+function adjustColor(hex, amt){
+  let n = parseInt(hex.replace("#",""),16);
+  let r = Math.min(255, Math.max(0,(n>>16)+amt));
+  let g = Math.min(255, Math.max(0,((n>>8)&255)+amt));
+  let b = Math.min(255, Math.max(0,(n&255)+amt));
+  return `rgb(${r},${g},${b})`;
+}
+
+function drawVariantCard(container, card, index){
+  const canvas = document.createElement("canvas");
+  canvas.className = "card";
+  canvas.width = 100;
+  canvas.height = 140;
+  const ctx = canvas.getContext("2d");
+
+  drawShape(ctx, adjustColor(card.color, (index-2)*10), card.shape);
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "10px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(card.name, 50, 120);
+
+  container.appendChild(canvas);
+}
+
+function drawShape(ctx, color, shape){
+  ctx.fillStyle = color;
+  const cx=50, cy=70, s=30;
+  ctx.beginPath();
+  if (shape==="circle") ctx.arc(cx,cy,s,0,Math.PI*2);
+  if (shape==="triangle"){
+    ctx.moveTo(cx,cy-s);
+    ctx.lineTo(cx-s,cy+s);
+    ctx.lineTo(cx+s,cy+s);
+    ctx.closePath();
+  }
+  if (shape==="diamond"){
+    ctx.moveTo(cx,cy-s);
+    ctx.lineTo(cx-s,cy);
+    ctx.lineTo(cx,cy+s);
+    ctx.lineTo(cx+s,cy);
+    ctx.closePath();
+  }
+  ctx.fill();
+}
 </script>
+
 </body>
 </html>
