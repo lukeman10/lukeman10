@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Neon-Vania: Final Fix</title>
+    <style>
+        body { background: #050505; color: #0ff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        #stats { width: 600px; display: flex; justify-content: space-between; padding: 15px; background: #111; border: 1px solid #0ff3; margin-bottom: 10px; box-sizing: border-box; }
+        canvas { background: #000; border: 3px solid #0ff; box-shadow: 0 0 20px #0ff4; }
+        .hint { color: #555; margin-top: 10px; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div id="stats">
+    <span>LOCATION: <span id="pos">2,2</span></span>
+    <span>UPGRADES: <span id="upgrades" style="color:#f0f">NONE</span></span>
+</div>
+
+<canvas id="game"></canvas>
+
+<div class="hint">WASD to Move | Find the <b>Purple Square</b> to Double Jump | <b>R</b> to Reset</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+canvas.width = 600;
+canvas.height = 400;
+
+// Physics Constants
+const TW = 60, TH = 50;
+const GRAVITY = 0.5;
+const JUMP = -10;
+
+let state = JSON.parse(localStorage.getItem('mvania_v4')) || {
+    rx: 2, ry: 2,
+    hasDJ: false,
+    items: []
+};
+
+const player = { x: 300, y: 300, w: 20, h: 25, vx: 0, vy: 0, grounded: false, jCount: 0 };
+let walls = [], items = [];
+
+const MAP = {
+    "2,2": [ // Hub: Exits Left, Right, Up, Down
+        "####_#####",
+        "#........#",
+        "_........_",
+        "###....###",
+        "#........#",
+        "#...##...#",
+        "##......##",
+        "####_#####"
+    ],
+    "1,2": [ // Left Room
+        "##########",
+        "#........#",
+        "#........_",
+        "#..#######",
+        "#........#",
+        "#####....#",
+        "#####....#",
+        "##########"
+    ],
+    "3,2": [ // Right Room
+        "##########",
+        "#........#",
+        "_........#",
+        "#######..#",
+        "#........#",
+        "#....#####",
+        "#....#####",
+        "##########"
+    ],
+    "2,1": [ // Up Room (The Upgrade)
+        "##########",
+        "#J.......#",
+        "###......#",
+        "#........#",
+        "#....#####",
+        "###......#",
+        "###......#",
+        "####_#####"
+    ],
+    "2,3": [ // Down Room
+        "####_#####",
+        "#........#",
+        "#........#",
+        "#..####..#",
+        "#........#",
+        "#...##...#",
+        "#...##...#",
+        "##########"
+    ]
+};
+
+function loadRoom(rx, ry, side) {
+    state.rx = rx; state.ry = ry;
+    walls = []; items = [];
+    const layout = MAP[`${rx},${ry}`] || MAP["2,2"];
+
+    layout.forEach((row, y) => {
+        [...row].forEach((char, x) => {
+            let px = x * TW, py = y * TH;
+            if (char === '#') walls.push({x: px, y: py, w: TW, h: TH});
+            if (char === 'J' && !state.items.includes(`j_${rx}_${ry}`)) {
+                items.push({x: px+20, y: py+15, w: 20, h: 20, type: 'dj'});
+            }
+        });
+    });
+
+    // Position player based on which side they entered from
+    if (side === 'L') player.x = 10;
+    if (side === 'R') player.x = canvas.width - player.w - 10;
+    if (side === 'T') player.y = 10;
+    if (side === 'B') player.y = canvas.height - player.h - 10;
+
+    document.getElementById('pos').innerText = `${rx},${ry}`;
+    document.getElementById('upgrades').innerText = state.hasDJ ? "DOUBLE JUMP" : "NONE";
+    localStorage.setItem('mvania_v4', JSON.stringify(state));
+}
+
+const keys = {};
+window.onkeydown = e => { 
+    keys[e.code] = true; 
+    if(e.code === 'KeyR') { localStorage.clear(); location.reload(); }
+};
+window.onkeyup = e => keys[e.code] = false;
+
+function loop() {
+    // Horizontal
+    if (keys['ArrowLeft'] || keys['KeyA']) player.vx = -4.5;
+    else if (keys['ArrowRight'] || keys['KeyD']) player.vx = 4.5;
+    else player.vx *= 0.8;
+
+    player.x += player.vx;
+    collide(player.vx, 0);
+
+    // Vertical
+    player.vy += GRAVITY;
+    player.y += player.vy;
+    player.grounded = false;
+    collide(0, player.vy);
+
+    // Jump
+    if ((keys['Space'] || keys['ArrowUp'] || keys['KeyW']) && !player.jHeld) {
+        if (player.grounded) {
+            player.vy = JUMP;
+            player.jCount = 1;
+        } else if (state.hasDJ && player.jCount < 2) {
+            player.vy = JUMP * 0.8;
+            player.jCount = 2;
+        }
+        player.jHeld = true;
+    }
+    if (!(keys['Space'] || keys['ArrowUp'] || keys['KeyW'])) player.jHeld = false;
+
+    // Transitions
+    if (player.x < -10) loadRoom(state.rx-1, state.ry, 'R');
+    if (player.x > canvas.width) loadRoom(state.rx+1, state.ry, 'L');
+    if (player.y < -10) loadRoom(state.rx, state.ry-1, 'B');
+    if (player.y > canvas.height) loadRoom(state.rx, state.ry+1, 'T');
+
+    // Pickups
+    items = items.filter(i => {
+        if (rect(player, i)) {
+            state.hasDJ = true;
+            state.items.push(`j_${state.rx}_${state.ry}`);
+            loadRoom(state.rx, state.ry);
+            return false;
+        }
+        return true;
+    });
+
+    draw();
+    requestAnimationFrame(loop);
+}
+
+function collide(vx, vy) {
+    walls.forEach(w => {
+        if (rect(player, w)) {
+            if (vy > 0) { player.y = w.y - player.h; player.vy = 0; player.grounded = true; player.jCount = 0; }
+            else if (vy < 0) { player.y = w.y + w.h; player.vy = 0; }
+            if (vx > 0) { player.x = w.x - player.w; player.vx = 0; }
+            else if (vx < 0) { player.x = w.x + w.w; player.vx = 0; }
+        }
+    });
+}
+
+function rect(r1, r2) {
+    return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y;
+}
+
+function draw() {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw Exits (faint glow)
+    ctx.fillStyle = '#111';
+    walls.forEach(w => {
+        ctx.fillRect(w.x, w.y, w.w, w.h);
+        ctx.strokeStyle = '#0ff2';
+        ctx.strokeRect(w.x, w.y, w.w, w.h);
+    });
+
+    items.forEach(i => {
+        ctx.fillStyle = '#f0f';
+        ctx.shadowBlur = 10; ctx.shadowColor = '#f0f';
+        ctx.fillRect(i.x, i.y, i.w, i.h);
+        ctx.shadowBlur = 0;
+    });
+
+    ctx.fillStyle = '#0ff';
+    ctx.shadowBlur = 15; ctx.shadowColor = '#0ff';
+    ctx.fillRect(player.x, player.y, player.w, player.h);
+    ctx.shadowBlur = 0;
+}
+
+loadRoom(state.rx, state.ry);
+loop();
+</script>
+</body>
+</html>
