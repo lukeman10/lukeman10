@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Element Sandbox</title>
+<style>
+  body {
+    margin: 0;
+    background: #111;
+    color: white;
+    font-family: sans-serif;
+    overflow: hidden;
+  }
+  #ui {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: #222;
+    padding: 6px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    z-index: 10;
+  }
+  button {
+    background: #333;
+    color: white;
+    border: 1px solid #555;
+    padding: 4px 8px;
+    cursor: pointer;
+  }
+  button.active {
+    background: #0a84ff;
+  }
+  canvas {
+    display: block;
+  }
+</style>
+</head>
+<body>
+
+<div id="ui"></div>
+<canvas id="c"></canvas>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const WORLD_WIDTH = 3000;
+const WORLD_HEIGHT = 2000;
+
+let camX = 0, camY = 0;
+let mouseDown = false;
+let currentElement = "Water";
+
+const elements = {
+  Water:  { color:"#3498db", liquid:true },
+  Fire:   { color:"#e74c3c", hot:true, life:200 },
+  Earth:  { color:"#8e5a2b", solid:true },
+  Air:    { color:"#aaaaaa", gas:true },
+
+  Steam:  { color:"#bdc3c7", gas:true, life:300 },
+  Mud:    { color:"#5d3b1a", solid:true },
+  Lava:   { color:"#ff6b00", hot:true, liquid:true },
+  Smoke:  { color:"#555", gas:true, life:250 }
+};
+
+let unlocked = new Set(["Water","Fire","Earth","Air"]);
+let particles = [];
+
+function updateUI() {
+  const ui = document.getElementById("ui");
+  ui.innerHTML = "";
+  unlocked.forEach(e => {
+    const b = document.createElement("button");
+    b.textContent = e;
+    if (e === currentElement) b.classList.add("active");
+    b.onclick = () => {
+      currentElement = e;
+      updateUI();
+    };
+    ui.appendChild(b);
+  });
+}
+updateUI();
+
+function spawn(x,y,type) {
+  particles.push({
+    x, y,
+    vx:(Math.random()-0.5)*0.5,
+    vy:(Math.random()-0.5)*0.5,
+    type,
+    life: elements[type].life ?? Infinity
+  });
+}
+
+canvas.addEventListener("mousedown",()=>mouseDown=true);
+canvas.addEventListener("mouseup",()=>mouseDown=false);
+canvas.addEventListener("mousemove",e=>{
+  if(!mouseDown) return;
+  spawn(e.clientX+camX,e.clientY+camY,currentElement);
+});
+
+window.addEventListener("keydown",e=>{
+  if(e.key==="a") camX-=40;
+  if(e.key==="d") camX+=40;
+  if(e.key==="w") camY-=40;
+  if(e.key==="s") camY+=40;
+});
+
+function tryReact(a,b) {
+  const pair = [a.type,b.type].sort().join("+");
+
+  const reactions = {
+    "Fire+Water":"Steam",
+    "Earth+Water":"Mud",
+    "Earth+Fire":"Lava",
+    "Air+Fire":"Smoke"
+  };
+
+  const result = reactions[pair];
+  if(result) {
+    unlocked.add(result);
+    updateUI();
+    a.type = result;
+    b.life = 0;
+  }
+}
+
+function update() {
+  for(let i=0;i<particles.length;i++){
+    const p = particles[i];
+    p.life--;
+
+    if(elements[p.type].liquid) p.vy+=0.02;
+    if(elements[p.type].gas) p.vy-=0.01;
+
+    p.x+=p.vx;
+    p.y+=p.vy;
+
+    p.x=Math.max(0,Math.min(WORLD_WIDTH,p.x));
+    p.y=Math.max(0,Math.min(WORLD_HEIGHT,p.y));
+
+    for(let j=i+1;j<particles.length;j++){
+      const q = particles[j];
+      if(Math.hypot(p.x-q.x,p.y-q.y)<6){
+        tryReact(p,q);
+      }
+    }
+  }
+  particles = particles.filter(p=>p.life>0);
+}
+
+function draw() {
+  ctx.fillStyle="#000";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.save();
+  ctx.translate(-camX,-camY);
+
+  particles.forEach(p=>{
+    ctx.fillStyle=elements[p.type].color;
+    ctx.fillRect(p.x-2,p.y-2,4,4);
+  });
+
+  ctx.restore();
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

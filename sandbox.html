@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Builder Humans - With Site Marker</title>
+<style>
+  body { margin:0; background:#111; overflow:hidden; font-family: sans-serif; user-select: none; }
+  #ui {
+    position:fixed; top:0; left:0; width:100%;
+    background:#222; padding:8px; display:flex; gap:6px; z-index:10;
+    border-bottom: 1px solid #444;
+  }
+  button { background:#333; color:white; border:1px solid #555; padding:6px 12px; cursor:pointer; border-radius: 4px; }
+  button.active { background:#0a84ff; border-color: #55aaff; }
+  canvas { display:block; cursor: crosshair; }
+</style>
+</head>
+<body>
+<div id="ui"></div>
+<canvas id="c"></canvas>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const CELL = 5;
+const W = Math.floor(canvas.width / CELL);
+const H = Math.floor(canvas.height / CELL);
+
+const EMPTY=0, SAND=1, WATER=2, STONE=3, FIRE=4, TNT=5, PERSON=6, DIRT=7, SAPLING=8, TREE=9, BRICK=10;
+const COLORS = { SAND:"#d6b36a", WATER:"#3498db", STONE:"#777", DIRT:"#654321", SAPLING:"#2ecc71", TREE:"#5a3d2b", BRICK:"#b35a27", SKIN:"#f1c27d" };
+
+let grid = new Uint8Array(W*H);
+let humans = [];
+let current = SAND;
+let mouseDown = false;
+
+// --- BLUEPRINT SYSTEM ---
+let buildOrigin = { x: Math.floor(W/2), y: H-15 };
+let blueprint = [];
+let buildIndex = 0;
+
+function createHouseBlueprint() {
+  blueprint = [];
+  // Foundation
+  for(let x=-3; x<=3; x++) blueprint.push({x, y:0}); 
+  // Walls
+  for(let y=-1; y>=-4; y--) { blueprint.push({x:-3, y}); blueprint.push({x:3, y}); }
+  // Roof
+  blueprint.push({x:-2, y:-5}); blueprint.push({x:-1, y:-6}); blueprint.push({x:0, y:-7}); 
+  blueprint.push({x:1, y:-6}); blueprint.push({x:2, y:-5});
+}
+createHouseBlueprint();
+
+const elements = [[SAND,"Sand"],[DIRT,"Dirt"],[WATER,"Water"],[SAPLING,"Sapling"],[PERSON,"Human"]];
+const ui = document.getElementById("ui");
+elements.forEach(([id,name])=>{
+  const b=document.createElement("button"); b.textContent=name;
+  if(id === current) b.classList.add("active");
+  b.onclick=()=>{ 
+    current=id; 
+    document.querySelectorAll("button").forEach(x=>x.classList.remove("active")); 
+    b.classList.add("active"); 
+  };
+  ui.appendChild(b);
+});
+
+function handleInput(e) {
+  const x = Math.floor(e.clientX / CELL);
+  const y = Math.floor(e.clientY / CELL);
+  if (current === PERSON) {
+    if (g(x,y) === EMPTY) spawnPerson(x,y);
+  } else {
+    for(let dx=0; dx<=1; dx++) for(let dy=0; dy<=1; dy++) set(x+dx, y+dy, current);
+  }
+}
+
+canvas.addEventListener("mousedown", e => { mouseDown = true; handleInput(e); });
+window.addEventListener("mouseup", () => { mouseDown = false; });
+canvas.addEventListener("mousemove", e => { if(mouseDown) handleInput(e); });
+
+function i(x,y){ return x+y*W; }
+function g(x,y){ return (x<0||y<0||x>=W||y>=H) ? STONE : grid[i(x,y)]; }
+function set(x,y,v){ if(x>=0&&y>=0&&x<W&&y<H) grid[i(x,y)] = v; }
+
+function spawnPerson(x,y){
+  set(x,y,PERSON);
+  humans.push({ x, y, inv: { wood:0, sand:0, water:0, bricks:0 }, dir: 1, digTick: 0 });
+}
+
+function updateHumans(){
+  let houseDone = buildIndex >= blueprint.length;
+  
+  for (let j = humans.length - 1; j >= 0; j--) {
+    let h = humans[j];
+    if (grid[i(h.x, h.y)] !== PERSON) { humans.splice(j, 1); continue; }
+
+    if (g(h.x, h.y+1) === EMPTY) {
+      set(h.x, h.y, EMPTY); h.y += 1; set(h.x, h.y, PERSON);
+      continue;
+    }
+
+    h.digTick++;
+    if(h.inv.bricks < 1 && h.digTick > 20) {
+      for(let dx=-1; dx<=1; dx++) {
+        for(let dy=-1; dy<=1; dy++) {
+          let t = g(h.x+dx, h.y+dy);
+          if(t === TREE && h.inv.wood < 1) { h.inv.wood = 1; set(h.x+dx, h.y+dy, EMPTY); break; }
+          if(t === SAND && h.inv.sand < 1) { h.inv.sand = 1; set(h.x+dx, h.y+dy, EMPTY); break; }
+          if(t === WATER && h.inv.water < 1) { h.inv.water = 1; set(h.x+dx, h.y+dy, EMPTY); break; }
+        }
+      }
+    }
+
+    if(h.inv.wood && h.inv.sand && h.inv.water) { h.inv.wood=0; h.inv.sand=0; h.inv.water=0; h.inv.bricks=1; }
+
+    if(!houseDone) {
+      let target = blueprint[buildIndex];
+      let tx = buildOrigin.x + target.x;
+      let ty = buildOrigin.y + target.y;
+
+      if(h.inv.bricks > 0) {
+        h.dir = (tx > h.x) ? 1 : -1;
+        if(Math.abs(h.x - tx) <= 1 && Math.abs(h.y - ty) <= 2) {
+            if(g(tx, ty) === EMPTY || g(tx, ty) === TREE) { 
+                set(tx, ty, BRICK); h.inv.bricks = 0; buildIndex++; 
+                if(g(h.x, h.y+1) === TREE) set(h.x, h.y+1, EMPTY);
+            }
+        }
+        if(ty < h.y - 1 && h.inv.wood === 1 && Math.abs(h.x - tx) < 2) {
+             if(g(h.x, h.y-1) === EMPTY) { set(h.x, h.y-1, TREE); h.inv.wood = 0; }
+        }
+      }
+    }
+
+    if(Math.random() < 0.2) {
+      let nx = h.x + h.dir;
+      if(g(nx, h.y) === TREE && (houseDone || Math.random() < 0.1)) {
+          set(nx, h.y, EMPTY);
+      } else if(g(nx, h.y) === EMPTY) { 
+          set(h.x, h.y, EMPTY); h.x = nx; set(h.x, h.y, PERSON); 
+      } else if(g(nx, h.y-1) === EMPTY) { 
+          set(h.x, h.y, EMPTY); h.x = nx; h.y -= 1; set(h.x, h.y, PERSON); 
+      } else { 
+          h.dir *= -1; 
+      }
+    }
+  }
+}
+
+function updatePhysics(){
+  for(let y=H-1; y>=0; y--){
+    for(let x=0; x<W; x++){
+      const t = grid[i(x,y)];
+      if(t === EMPTY || t === PERSON || t === STONE || t === BRICK || t === TREE) continue;
+      if(Math.random() < 0.2) continue;
+      if(t === SAND || t === DIRT) { 
+        if(g(x,y+1) === EMPTY) { set(x,y,EMPTY); set(x,y+1,t); } 
+        else if(g(x-1,y+1) === EMPTY) { set(x,y,EMPTY); set(x-1,y+1,t); }
+        else if(g(x+1,y+1) === EMPTY) { set(x,y,EMPTY); set(x+1,y+1,t); }
+      }
+      else if(t === WATER) {
+        if(g(x,y+1) === EMPTY) { set(x,y,EMPTY); set(x,y+1,t); }
+        else { let d=Math.random()<0.5?-1:1; if(g(x+d,y)===EMPTY){ set(x,y,EMPTY); set(x+d,y,t); } }
+      }
+      else if(t === SAPLING && g(x,y+1) === DIRT && Math.random() < 0.01) {
+        set(x,y,TREE); for(let th=1; th<4; th++) if(g(x,y-th)===EMPTY) set(x,y-th,TREE);
+      }
+    }
+  }
+}
+
+function draw(){
+  ctx.fillStyle="#111"; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // --- DRAW BUILD SITE MARKER ---
+  if(buildIndex < blueprint.length) {
+    ctx.globalAlpha = 0.3;
+    ctx.strokeStyle = "#fff";
+    ctx.setLineDash([2, 2]);
+    // Draw the ghost of the blueprint
+    blueprint.forEach((pt, index) => {
+        if(index >= buildIndex) {
+            ctx.strokeRect((buildOrigin.x + pt.x) * CELL, (buildOrigin.y + pt.y) * CELL, CELL, CELL);
+        }
+    });
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1.0;
+  }
+
+  for(let y=0; y<H; y++){
+    for(let x=0; x<W; x++){
+      const t = grid[i(x,y)];
+      if(t === EMPTY) continue;
+      if(t===SAND) ctx.fillStyle=COLORS.SAND;
+      else if(t===WATER) ctx.fillStyle=COLORS.WATER;
+      else if(t===DIRT) ctx.fillStyle=COLORS.DIRT;
+      else if(t===TREE) ctx.fillStyle=COLORS.TREE;
+      else if(t===BRICK) ctx.fillStyle=COLORS.BRICK;
+      else if(t===SAPLING) ctx.fillStyle=COLORS.SAPLING;
+      else if(t===PERSON) ctx.fillStyle="#fff";
+      ctx.fillRect(x*CELL, y*CELL, CELL, CELL);
+      if(t===PERSON){ ctx.fillStyle=COLORS.SKIN; ctx.fillRect(x*CELL,(y-1)*CELL,CELL,CELL); }
+    }
+  }
+}
+
+(function loop(){ updatePhysics(); updateHumans(); draw(); requestAnimationFrame(loop); })();
+</script>
+</body>
+</html>
